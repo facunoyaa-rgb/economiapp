@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=true
+Name=Dashboard Macro Argentina
+Comment=Iniciar el Dashboard de Variables Macroeconómicas
+Exec=/home/facundo/antigravity/Dashboard_Macro/iniciar.sh
+Path=/home/facundo/antigravity/Dashboard_Macro
+Icon=utilities-terminal
+Categories=Application;Development;

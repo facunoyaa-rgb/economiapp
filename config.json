@@ -1,0 +1,118 @@
+{
+  "api": {
+    "base_url": "https://apis.datos.gob.ar/series/api",
+    "docs_url": "https://apis.datos.gob.ar/series/api/docs/"
+  },
+  "dashboard_metadata": {
+    "name": "Dashboard de Variables Macroeconómicas Argentinas",
+    "version": "1.0.0",
+    "country": "Argentina",
+    "last_updated_config": "2026-06-05"
+  },
+  "series": {
+    "emae": {
+      "desc_corta": "Estimador Mensual de Actividad Económica",
+      "fuente": "INDEC",
+      "opciones": {
+        "original": {
+          "id": "143.3_NO_PR_2004_A_21",
+          "descripcion": "EMAE. Base 2004 - Serie Original",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "desestacionalizado": {
+          "id": "143.3_NO_PR_2004_A_31",
+          "descripcion": "EMAE desestacionalizado. Base 2004",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        }
+      }
+    },
+    "ipc": {
+      "desc_corta": "Índice de Precios al Consumidor (Inflación)",
+      "fuente": "INDEC",
+      "opciones": {
+        "nivel_general": {
+          "id": "148.3_INIVELNAL_DICI_M_26",
+          "descripcion": "IPC. Nivel General Nacional. Base dic 2016. Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Dic 2016 = 100)"
+        },
+        "variacion_mensual": {
+          "id": "145.3_INGNACUAL_DICI_M_38",
+          "descripcion": "IPC. Tasa de variación mensual. Nivel General. Nacional.",
+          "frecuencia": "mensual",
+          "unidad": "Tasa decimal (ej. 0.0258 = 2.58%)"
+        }
+      }
+    },
+    "tasa_interes": {
+      "desc_corta": "Tasa de interés por depósitos a 30 días (BCRA)",
+      "fuente": "BCRA (Banco Central)",
+      "opciones": {
+        "promedio_mensual": {
+          "id": "89.1_TIPF35D_0_0_35",
+          "descripcion": "Tasas de interés publicadas por el BCRA. Plazo fijo entre 30 a 59 días. Promedio mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Tasa Nominal Anual (TNA) en porcentaje"
+        },
+        "diaria": {
+          "id": "89.2_TS_INTELAR_0_D_20",
+          "descripcion": "Tasas de interés publicadas por el BCRA. Badlar. Diarios.",
+          "frecuencia": "diaria",
+          "unidad": "Tasa Nominal Anual (TNA) en porcentaje"
+        }
+      }
+    },
+    "exportaciones": {
+      "desc_corta": "Exportaciones Totales (ICA)",
+      "fuente": "INDEC",
+      "id": "74.3_IET_0_M_16",
+      "descripcion": "Exportaciones totales (FOB). Mensual.",
+      "frecuencia": "mensual",
+      "unidad": "Millones de dólares estadounidenses (USD)"
+    },
+    "importaciones": {
+      "desc_corta": "Importaciones Totales (ICA)",
+      "fuente": "INDEC",
+      "id": "76.3_ITG_0_M_17",
+      "descripcion": "Importaciones total general (CIF). Mensual.",
+      "frecuencia": "mensual",
+      "unidad": "Millones de dólares estadounidenses (USD)"
+    },
+    "gasto_publico": {
+      "desc_corta": "Gasto Público del Sector Público Nacional (Base Caja)",
+      "fuente": "Secretaría de Hacienda",
+      "opciones": {
+        "primario": {
+          "id": "372.9_GTOS_PRIMA017__39_31",
+          "descripcion": "Gastos primarios después de figurativos (Metodología 2017). Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos argentinos (ARS)"
+        },
+        "total": {
+          "id": "372.9_GTOS_DESPU017__29_72",
+          "descripcion": "Gastos totales después de figurativos (Metodología 2017). Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos argentinos (ARS)"
+        }
+      }
+    },
+    "credito_interno": {
+      "desc_corta": "Préstamos al sector privado en pesos",
+      "fuente": "BCRA",
+      "id": "91.1_DETALLE_PRPOT_0_0_25",
+      "descripcion": "Préstamos al sector privado en pesos. Mensual.",
+      "frecuencia": "mensual",
+      "unidad": "Millones de pesos"
+    },
+    "salarios": {
+      "desc_corta": "Remuneración imponible promedio de los trabajadores estables (RIPTE)",
+      "fuente": "Secretaría de Trabajo, Empleo y Seguridad Social",
+      "id": "158.1_REPTE_0_0_5",
+      "descripcion": "RIPTE. Mensual.",
+      "frecuencia": "mensual",
+      "unidad": "Pesos corrientes"
+    }
+  }
+}
