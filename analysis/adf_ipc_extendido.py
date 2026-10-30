@@ -3,7 +3,7 @@ import numpy as np
 from statsmodels.tsa.stattools import adfuller
 
 # 1. Cargar y limpiar el dataset
-df = pd.read_csv('sh_ipc_05_26(1).csv')
+df = pd.read_csv('sh_ipc_05_26.csv')
 df['IPC'] = df['IPC'].str.replace(',', '.').astype(float)
 
 # 2. Calcular Inflación (Primera diferencia del log) y Aceleración (Diferencia de la inflación)

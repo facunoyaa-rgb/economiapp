@@ -6,11 +6,11 @@ from statsmodels.tsa.api import VAR
 # ========================================================
 # 1. CARGA, LIMPIEZA Y ENSAMBLE MACROECONÓMICA
 # ========================================================
-df_ipc = pd.read_csv('sh_ipc_05_26(1).csv')
+df_ipc = pd.read_csv('sh_ipc_05_26.csv')
 df_ipc['IPC'] = df_ipc['IPC'].str.replace(',', '.').astype(float)
 df_ipc['Fecha'] = pd.date_range(start='2016-12-01', periods=len(df_ipc), freq='ME')
 
-df_tc = pd.read_csv('tipo_cambio_promedio_mensual_argentina.csv')
+df_tc = pd.read_csv('../data/raw/tipo_cambio_promedio_mensual_argentina.csv')
 df_tc['Fecha'] = pd.date_range(start='2016-01-01', periods=len(df_tc), freq='ME')
 
 df_macro = pd.merge(df_ipc[['Fecha', 'IPC']], df_tc[['Fecha', df_tc.columns[1]]], on='Fecha', how='inner')

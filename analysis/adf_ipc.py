@@ -4,7 +4,7 @@ from statsmodels.tsa.stattools import adfuller
 
 # 1. Cargar el dataset
 # Nota: Como el archivo está en tu directorio actual, usamos el nombre directamente.
-df = pd.read_csv('sh_ipc_05_26(1).csv')
+df = pd.read_csv('sh_ipc_05_26.csv')
 
 # 2. Limpieza de datos: Reemplazar comas por puntos y convertir a flotante
 df['IPC'] = df['IPC'].str.replace(',', '.').astype(float)

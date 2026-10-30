@@ -5,10 +5,30 @@
   },
   "dashboard_metadata": {
     "name": "Dashboard de Variables Macroeconómicas Argentinas",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "country": "Argentina",
-    "last_updated_config": "2026-06-05"
+    "last_updated_config": "2026-10-30"
   },
+  "cache": {
+    "dir": "data/cache",
+    "max_age_hours": 6,
+    "timeout_seconds": 20,
+    "retries": 3
+  },
+  "columnas": {
+    "EMAE_Original": "emae.opciones.original",
+    "EMAE_Desestacionalizado": "emae.opciones.desestacionalizado",
+    "IPC_Nivel_General": "ipc.opciones.nivel_general",
+    "IPC_Variacion_Mensual": "ipc.opciones.variacion_mensual",
+    "Tasa_Interes_Nominal": "tasa_interes.opciones.promedio_mensual",
+    "Exportaciones_FOB": "exportaciones",
+    "Importaciones_CIF": "importaciones",
+    "Gasto_Publico_Primario": "gasto_publico.opciones.primario",
+    "Gasto_Publico_Total": "gasto_publico.opciones.total",
+    "Credito_Interno": "credito_interno",
+    "Salarios": "salarios"
+  },
+  "deflactar": ["Gasto_Publico_Primario", "Gasto_Publico_Total", "Credito_Interno", "Salarios"],
   "series": {
     "emae": {
       "desc_corta": "Estimador Mensual de Actividad Económica",
