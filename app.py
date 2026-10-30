@@ -9,6 +9,7 @@ import logging
 import os
 
 from dash import Dash, Input, Output, State, callback, ctx, dcc, html, no_update
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import ui.theme  # noqa: F401  (registra el template de Plotly)
 from pipeline import ERROR, FROM_CACHE, CSV_FALLBACK, MacroData, get_macro_data
@@ -28,6 +29,7 @@ app = Dash(
     suppress_callback_exceptions=True,
 )
 server = app.server
+server.wsgi_app = ProxyFix(server.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 RANGE_OPTIONS = [
     {"label": "1A", "value": 1},

@@ -23,6 +23,8 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -254,10 +256,13 @@ def read_cache(config: dict) -> tuple[pd.DataFrame, dict] | None:
 def write_cache(config: dict, raw: pd.DataFrame, meta: dict) -> None:
     data_path, meta_path = _cache_paths(config)
     data_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = data_path.with_suffix(".tmp")
-    raw.to_parquet(tmp)
-    tmp.replace(data_path)
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    suffix = f".{os.getpid()}.{threading.get_ident()}.tmp"
+    tmp_data = data_path.with_suffix(suffix)
+    raw.to_parquet(tmp_data)
+    tmp_data.replace(data_path)
+    tmp_meta = meta_path.with_suffix(suffix)
+    tmp_meta.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_meta.replace(meta_path)
 
 
 # --------------------------------------------------------------------------- #
