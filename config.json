@@ -1,13 +1,20 @@
 {
   "api": {
     "base_url": "https://apis.datos.gob.ar/series/api",
-    "docs_url": "https://apis.datos.gob.ar/series/api/docs/"
+    "docs_url": "https://apis.datos.gob.ar/series/api/docs/",
+    "bcra_v4_url": "https://api.bcra.gob.ar/estadisticas/v4.0/monetarias",
+    "bluelytics_url": "https://api.bluelytics.com.ar/v2/evolution.json",
+    "dolarapi_url": "https://dolarapi.com/v1/dolares",
+    "itcrm_xlsx_url": "https://www.bcra.gob.ar/Pdfs/PublicacionesEstadisticas/ITCRMSerie.xlsx",
+    "indec_uci_xls_url": "https://www.indec.gob.ar/ftp/cuadros/economia/sh_capacidad_08_26.xls",
+    "ambito_riesgo_url": "https://mercados.ambito.com//riesgopais/historico-general/2016-01-01/2027-12-31",
+    "rava_riesgo_url": "https://www.rava.com/perfil/riesgo%20pais"
   },
   "dashboard_metadata": {
     "name": "Dashboard de Variables Macroeconómicas Argentinas",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "country": "Argentina",
-    "last_updated_config": "2026-10-30"
+    "last_updated_config": "2026-11-02"
   },
   "cache": {
     "dir": "data/cache",
@@ -18,121 +25,851 @@
   "columnas": {
     "EMAE_Original": "emae.opciones.original",
     "EMAE_Desestacionalizado": "emae.opciones.desestacionalizado",
+    "EMAE_Tendencia_Ciclo": "emae.opciones.tendencia_ciclo",
+    "EMAE_Agro": "emae_sectores.opciones.agro",
+    "EMAE_Industria": "emae_sectores.opciones.industria",
+    "EMAE_Construccion": "emae_sectores.opciones.construccion",
+    "EMAE_Comercio": "emae_sectores.opciones.comercio",
+    "EMAE_Minas_Canteras": "emae_sectores.opciones.minas_canteras",
+    "EMAE_Financiero": "emae_sectores.opciones.financiero",
+    "IPI_Manufacturero": "ipi.opciones.original",
+    "IPI_Desestacionalizado": "ipi.opciones.desestacionalizado",
+    "ISAC_General": "isac.opciones.original",
+    "ISAC_Desestacionalizado": "isac.opciones.desestacionalizado",
+    "Supermercados_Constantes": "supermercados.opciones.constantes_desest",
+    "UCI_Industria": "uci_industria",
     "IPC_Nivel_General": "ipc.opciones.nivel_general",
     "IPC_Variacion_Mensual": "ipc.opciones.variacion_mensual",
+    "IPC_Nucleo": "ipc.opciones.nucleo",
+    "IPC_Regulados": "ipc.opciones.regulados",
+    "IPC_Estacionales": "ipc.opciones.estacionales",
+    "IPIM_Nivel_General": "ipim",
+    "REM_Inflacion_12m": "expectativas.opciones.rem_12m",
+    "Expectativa_Inflacion_UTDT": "expectativas.opciones.utdt_12m",
+    "CER": "indexadores.opciones.cer",
+    "UVA": "indexadores.opciones.uva",
+    "UVI": "indexadores.opciones.uvi",
+    "ICL": "indexadores.opciones.icl",
     "Tasa_Interes_Nominal": "tasa_interes.opciones.promedio_mensual",
+    "Tasa_BADLAR": "tasa_interes.opciones.badlar",
+    "Tasa_TAMAR": "tasa_interes.opciones.tamar",
+    "Tasa_Adelantos": "tasa_interes.opciones.adelantos",
+    "Tasa_Personales": "tasa_interes.opciones.personales",
+    "Base_Monetaria": "monetario.opciones.base_monetaria",
+    "Circulacion_Monetaria": "monetario.opciones.circulacion",
+    "Depositos_Privados_Pesos": "monetario.opciones.depositos_efectivo",
+    "Depositos_Plazo_Fijo": "monetario.opciones.plazo_fijo",
+    "M2_Privado_Var_IA": "monetario.opciones.m2_privado_ia",
+    "Credito_Interno": "credito_interno",
     "Exportaciones_FOB": "exportaciones",
     "Importaciones_CIF": "importaciones",
+    "Expo_Productos_Primarios": "ica_detalle.opciones.expo_pp",
+    "Expo_MOA": "ica_detalle.opciones.expo_moa",
+    "Expo_MOI": "ica_detalle.opciones.expo_moi",
+    "Expo_Combustibles_Energia": "ica_detalle.opciones.expo_cye",
+    "Impo_Bienes_Capital": "ica_detalle.opciones.impo_bk",
+    "Impo_Bienes_Intermedios": "ica_detalle.opciones.impo_bi",
+    "Impo_Combustibles": "ica_detalle.opciones.impo_comb",
+    "Impo_Bienes_Consumo": "ica_detalle.opciones.impo_bco",
+    "Reservas_BCRA": "sector_externo.opciones.reservas",
+    "TC_Mayorista": "sector_externo.opciones.tc_mayorista",
+    "TC_Minorista": "sector_externo.opciones.tc_minorista",
+    "Dolar_Blue": "sector_externo.opciones.dolar_blue",
+    "ITCRM": "sector_externo.opciones.itcrm",
+    "ITCRB_Brasil": "sector_externo.opciones.itcrb_brasil",
+    "ITCRB_EEUU": "sector_externo.opciones.itcrb_eeuu",
+    "Riesgo_Pais": "sector_externo.opciones.riesgo_pais",
+    "Ingresos_Publicos_Totales": "gasto_publico.opciones.ingresos_totales",
     "Gasto_Publico_Primario": "gasto_publico.opciones.primario",
     "Gasto_Publico_Total": "gasto_publico.opciones.total",
-    "Credito_Interno": "credito_interno",
-    "Salarios": "salarios"
+    "Resultado_Primario_Base_Caja": "gasto_publico.opciones.resultado_primario",
+    "Resultado_Financiero_Base_Caja": "gasto_publico.opciones.resultado_financiero",
+    "Recaudacion_Total": "recaudacion.opciones.total",
+    "Recaudacion_DGI": "recaudacion.opciones.dgi",
+    "Recaudacion_DGA": "recaudacion.opciones.dga",
+    "Recaudacion_Seg_Social": "recaudacion.opciones.seg_social",
+    "Salarios": "salarios",
+    "Indice_Salarios_Total": "salarios_indec.opciones.total",
+    "Indice_Salarios_Privado_Reg": "salarios_indec.opciones.privado_registrado",
+    "Indice_Salarios_Publico": "salarios_indec.opciones.publico",
+    "Indice_Salarios_No_Reg": "salarios_indec.opciones.no_registrado",
+    "Canasta_Basica_Alimentaria": "social.opciones.cba",
+    "Canasta_Basica_Total": "social.opciones.cbt",
+    "Tasa_Desocupacion": "social.opciones.desocupacion",
+    "Tasa_Empleo": "social.opciones.empleo",
+    "Tasa_Actividad": "social.opciones.actividad",
+    "Pobreza_Personas": "social.opciones.pobreza_personas",
+    "Pobreza_Hogares": "social.opciones.pobreza_hogares"
   },
-  "deflactar": ["Gasto_Publico_Primario", "Gasto_Publico_Total", "Credito_Interno", "Salarios"],
+  "deflactar": [
+    "Ingresos_Publicos_Totales",
+    "Gasto_Publico_Primario",
+    "Gasto_Publico_Total",
+    "Resultado_Primario_Base_Caja",
+    "Resultado_Financiero_Base_Caja",
+    "Recaudacion_Total",
+    "Recaudacion_DGI",
+    "Recaudacion_DGA",
+    "Recaudacion_Seg_Social",
+    "Credito_Interno",
+    "Base_Monetaria",
+    "Circulacion_Monetaria",
+    "Depositos_Privados_Pesos",
+    "Depositos_Plazo_Fijo",
+    "Salarios",
+    "Indice_Salarios_Total",
+    "Indice_Salarios_Privado_Reg",
+    "Indice_Salarios_Publico",
+    "Indice_Salarios_No_Reg",
+    "TC_Mayorista",
+    "Dolar_Blue"
+  ],
   "series": {
     "emae": {
       "desc_corta": "Estimador Mensual de Actividad Económica",
-      "fuente": "INDEC",
+      "fuente": "INDEC (API datos.gob.ar)",
       "opciones": {
         "original": {
           "id": "143.3_NO_PR_2004_A_21",
+          "field_title": "emae_original",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/143/distribution/143.3/download/emae-valores-anuales-indice-base-2004-mensual.csv",
           "descripcion": "EMAE. Base 2004 - Serie Original",
           "frecuencia": "mensual",
           "unidad": "Índice (Base 2004 = 100)"
         },
         "desestacionalizado": {
           "id": "143.3_NO_PR_2004_A_31",
+          "field_title": "emae_desestacionalizada",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/143/distribution/143.3/download/emae-valores-anuales-indice-base-2004-mensual.csv",
           "descripcion": "EMAE desestacionalizado. Base 2004",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "tendencia_ciclo": {
+          "id": "143.3_NO_PR_2004_A_28",
+          "field_title": "emae_tendencia_ciclo",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/143/distribution/143.3/download/emae-valores-anuales-indice-base-2004-mensual.csv",
+          "descripcion": "EMAE tendencia-ciclo. Base 2004",
           "frecuencia": "mensual",
           "unidad": "Índice (Base 2004 = 100)"
         }
       }
     },
+    "emae_sectores": {
+      "desc_corta": "EMAE por Sectores de Actividad",
+      "fuente": "INDEC (API datos.gob.ar)",
+      "opciones": {
+        "agro": {
+          "id": "11.3_ISOM_2004_M_39",
+          "field_title": "agricultura_ganaderia_caza_silvicultura",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/11/distribution/11.3/download/emae-apertura-por-sectores-valores-mensuales-indice-base-2004.csv",
+          "descripcion": "EMAE. Agricultura, ganadería, caza y silvicultura",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "industria": {
+          "id": "11.3_VMASD_2004_M_23",
+          "field_title": "industria_manufacturera",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/11/distribution/11.3/download/emae-apertura-por-sectores-valores-mensuales-indice-base-2004.csv",
+          "descripcion": "EMAE. Industria manufacturera",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "construccion": {
+          "id": "11.3_VMATC_2004_M_12",
+          "field_title": "construccion",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/11/distribution/11.3/download/emae-apertura-por-sectores-valores-mensuales-indice-base-2004.csv",
+          "descripcion": "EMAE. Construcción",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "comercio": {
+          "id": "11.3_AGCS_2004_M_41",
+          "field_title": "comercio_mayorista_minorista_reparaciones",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/11/distribution/11.3/download/emae-apertura-por-sectores-valores-mensuales-indice-base-2004.csv",
+          "descripcion": "EMAE. Comercio mayorista, minorista y reparaciones",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "minas_canteras": {
+          "id": "11.3_ISD_2004_M_26",
+          "field_title": "explotacion_minas_canteras",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/11/distribution/11.3/download/emae-apertura-por-sectores-valores-mensuales-indice-base-2004.csv",
+          "descripcion": "EMAE. Explotación de minas y canteras (Energía y Minería)",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "financiero": {
+          "id": "11.3_IM_2004_M_25",
+          "field_title": "intermediacion_financiera",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/11/distribution/11.3/download/emae-apertura-por-sectores-valores-mensuales-indice-base-2004.csv",
+          "descripcion": "EMAE. Intermediación financiera",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        }
+      }
+    },
+    "ipi": {
+      "desc_corta": "Índice de Producción Industrial Manufacturero (IPI)",
+      "fuente": "INDEC (API datos.gob.ar)",
+      "opciones": {
+        "original": {
+          "id": "453.1_SERIE_ORIGNAL_0_0_14_46",
+          "field_title": "serie_original",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/453/distribution/453.1/download/ipi-manufacturero.csv",
+          "descripcion": "IPI Manufacturero. Nivel General - Serie Original",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "desestacionalizado": {
+          "id": "453.1_SERIE_DESEADA_0_0_24_58",
+          "field_title": "serie_desestacionalizada",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/453/distribution/453.1/download/ipi-manufacturero.csv",
+          "descripcion": "IPI Manufacturero. Nivel General - Serie Desestacionalizada",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        }
+      }
+    },
+    "isac": {
+      "desc_corta": "Indicador Sintético de la Actividad de la Construcción (ISAC)",
+      "fuente": "INDEC (API datos.gob.ar)",
+      "opciones": {
+        "original": {
+          "id": "33.2_ISAC_NIVELRAL_0_M_18_63",
+          "field_title": "isac_nivel_general",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/33/distribution/33.2/download/indicador-sintetico-actividad-construccion-valores-mensuales-base-2004.csv",
+          "descripcion": "ISAC Construcción. Nivel General - Serie Original",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        },
+        "desestacionalizado": {
+          "id": "33.2_ISAC_SIN_EDAD_0_M_23_56",
+          "field_title": "isac_sin_estacionalidad",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/33/distribution/33.2/download/indicador-sintetico-actividad-construccion-valores-mensuales-base-2004.csv",
+          "descripcion": "ISAC Construcción. Serie Desestacionalizada",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base 2004 = 100)"
+        }
+      }
+    },
+    "supermercados": {
+      "desc_corta": "Ventas en Supermercados",
+      "fuente": "INDEC (API datos.gob.ar)",
+      "opciones": {
+        "constantes_desest": {
+          "id": "455.1_VENTAS_PREADA_0_M_44_44",
+          "field_title": "ventas_precios_constantes_desestacionalizada",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/455/distribution/455.1/download/ventas-totales-supermercados-2.csv",
+          "descripcion": "Ventas en supermercados a precios constantes (desestacionalizada)",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos constantes"
+        }
+      }
+    },
+    "uci_industria": {
+      "desc_corta": "Utilización de la Capacidad Instalada en la Industria (UCI)",
+      "fuente": "INDEC (Planilla XLS + datos.gob.ar)",
+      "provider": "xls_indec_uci",
+      "id": "31.3_UNG_2004_M_18",
+      "field_title": "ucii_nivel_general",
+      "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/31/distribution/31.3/download/utilizacion-capacidad-instalada-industria-valores-mensuales-base-2004.csv",
+      "descripcion": "Utilización de la capacidad instalada en la industria. Nivel General (%)",
+      "frecuencia": "mensual",
+      "unidad": "Porcentaje (%)"
+    },
     "ipc": {
       "desc_corta": "Índice de Precios al Consumidor (Inflación)",
-      "fuente": "INDEC",
+      "fuente": "INDEC (API datos.gob.ar)",
       "opciones": {
         "nivel_general": {
           "id": "148.3_INIVELNAL_DICI_M_26",
+          "field_title": "ipc_nivel_general_nacional",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/145/distribution/145.9/download/indice-precios-al-consumidor-apertura-por-categorias-base-diciembre-2016-mensual.csv",
           "descripcion": "IPC. Nivel General Nacional. Base dic 2016. Mensual.",
           "frecuencia": "mensual",
           "unidad": "Índice (Base Dic 2016 = 100)"
         },
         "variacion_mensual": {
           "id": "145.3_INGNACUAL_DICI_M_38",
+          "field_title": "ipc_ng_nacional_tasa_variacion_mensual",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/145/distribution/145.3/download/indice-precios-al-consumidor-nivel-general-base-diciembre-2016-mensual.csv",
           "descripcion": "IPC. Tasa de variación mensual. Nivel General. Nacional.",
           "frecuencia": "mensual",
           "unidad": "Tasa decimal (ej. 0.0258 = 2.58%)"
+        },
+        "nucleo": {
+          "id": "148.3_INUCLEONAL_DICI_M_19",
+          "field_title": "ipc_nucleo_nacional",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/145/distribution/145.9/download/indice-precios-al-consumidor-apertura-por-categorias-base-diciembre-2016-mensual.csv",
+          "descripcion": "IPC. Categoría Núcleo Nacional. Base dic 2016.",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Dic 2016 = 100)"
+        },
+        "regulados": {
+          "id": "148.3_IREGULANAL_DICI_M_22",
+          "field_title": "ipc_regulados_nacional",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/145/distribution/145.9/download/indice-precios-al-consumidor-apertura-por-categorias-base-diciembre-2016-mensual.csv",
+          "descripcion": "IPC. Categoría Regulados Nacional. Base dic 2016.",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Dic 2016 = 100)"
+        },
+        "estacionales": {
+          "id": "148.3_IESTACINAL_DICI_M_25",
+          "field_title": "ipc_estacionales_nacional",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/145/distribution/145.9/download/indice-precios-al-consumidor-apertura-por-categorias-base-diciembre-2016-mensual.csv",
+          "descripcion": "IPC. Categoría Estacionales Nacional. Base dic 2016.",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Dic 2016 = 100)"
+        }
+      }
+    },
+    "ipim": {
+      "desc_corta": "Índice de Precios Internos al por Mayor (IPIM)",
+      "fuente": "INDEC (API datos.gob.ar)",
+      "id": "448.1_NIVEL_GENERAL_0_0_13_46",
+      "field_title": "nivel_general",
+      "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/448/distribution/448.1/download/indice-precios-internos-al-por-mayor.csv",
+      "descripcion": "IPIM Mayorista. Nivel General (Base Dic 2015 = 100)",
+      "frecuencia": "mensual",
+      "unidad": "Índice (Base Dic 2015 = 100)"
+    },
+    "expectativas": {
+      "desc_corta": "Expectativas de Inflación (REM BCRA y UTDT)",
+      "fuente": "BCRA (API v4.0) / UTDT (datos.gob.ar)",
+      "opciones": {
+        "rem_12m": {
+          "provider": "bcra_v4",
+          "id": "29",
+          "agg": "last",
+          "descripcion": "REM BCRA: Mediana de inflación esperada próximos 12 meses",
+          "frecuencia": "mensual",
+          "unidad": "Porcentaje interanual (%)"
+        },
+        "utdt_12m": {
+          "id": "431.1_EXPECTATIVANA_M_0_0_29_85",
+          "field_title": "expectativa_inflacion_mediana",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/431/distribution/431.1/download/expectativas-inflacion-a-doce-mes.csv",
+          "descripcion": "UTDT: Expectativa de inflación a 12 meses (Mediana)",
+          "frecuencia": "mensual",
+          "unidad": "Porcentaje (%)"
+        }
+      }
+    },
+    "indexadores": {
+      "desc_corta": "Unidades Indexadas Diarias (CER, UVA, UVI, ICL)",
+      "fuente": "BCRA (API v4.0)",
+      "opciones": {
+        "cer": {
+          "provider": "bcra_v4",
+          "id": "30",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Coeficiente de Estabilización de Referencia (CER, base 2/2/02=1)",
+          "frecuencia": "diaria",
+          "unidad": "Índice"
+        },
+        "uva": {
+          "provider": "bcra_v4",
+          "id": "31",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Unidad de Valor Adquisitivo (UVA, base 31/3/16=14.05)",
+          "frecuencia": "diaria",
+          "unidad": "Pesos argentinos (ARS)"
+        },
+        "uvi": {
+          "provider": "bcra_v4",
+          "id": "32",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Unidad de Vivienda (UVI, base 31/3/16=14.05)",
+          "frecuencia": "diaria",
+          "unidad": "Pesos argentinos (ARS)"
+        },
+        "icl": {
+          "provider": "bcra_v4",
+          "id": "40",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Índice para Contratos de Locación (ICL, base 30/6/20=1)",
+          "frecuencia": "diaria",
+          "unidad": "Índice"
         }
       }
     },
     "tasa_interes": {
-      "desc_corta": "Tasa de interés por depósitos a 30 días (BCRA)",
-      "fuente": "BCRA (Banco Central)",
+      "desc_corta": "Tasas de Interés Pasivas y Activas (BCRA)",
+      "fuente": "BCRA (datos.gob.ar y API v4.0)",
       "opciones": {
         "promedio_mensual": {
           "id": "89.1_TIPF35D_0_0_35",
+          "field_title": "tasas_interes_plazo_fijo_30_59_dias",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/89/distribution/89.1/download/principales-tasas-interes.csv",
           "descripcion": "Tasas de interés publicadas por el BCRA. Plazo fijo entre 30 a 59 días. Promedio mensual.",
           "frecuencia": "mensual",
-          "unidad": "Tasa Nominal Anual (TNA) en porcentaje"
+          "unidad": "Tasa Nominal Anual (TNA %)"
         },
-        "diaria": {
-          "id": "89.2_TS_INTELAR_0_D_20",
-          "descripcion": "Tasas de interés publicadas por el BCRA. Badlar. Diarios.",
+        "badlar": {
+          "provider": "bcra_v4",
+          "id": "7",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Tasa de interés BADLAR de bancos privados (TNA %)",
           "frecuencia": "diaria",
-          "unidad": "Tasa Nominal Anual (TNA) en porcentaje"
+          "unidad": "Tasa Nominal Anual (TNA %)"
+        },
+        "tamar": {
+          "provider": "bcra_v4",
+          "id": "44",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Tasa de interés TAMAR de bancos privados (TNA %)",
+          "frecuencia": "diaria",
+          "unidad": "Tasa Nominal Anual (TNA %)"
+        },
+        "adelantos": {
+          "provider": "bcra_v4",
+          "id": "13",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Tasa activa por adelantos en cuenta corriente (TNA %)",
+          "frecuencia": "diaria",
+          "unidad": "Tasa Nominal Anual (TNA %)"
+        },
+        "personales": {
+          "provider": "bcra_v4",
+          "id": "14",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Tasa activa de préstamos personales (TNA %)",
+          "frecuencia": "diaria",
+          "unidad": "Tasa Nominal Anual (TNA %)"
         }
       }
     },
+    "monetario": {
+      "desc_corta": "Agregados Monetarios y Depósitos (BCRA)",
+      "fuente": "BCRA (API v4.0)",
+      "opciones": {
+        "base_monetaria": {
+          "provider": "bcra_v4",
+          "id": "15",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Base Monetaria (saldo en millones de ARS)",
+          "frecuencia": "diaria",
+          "unidad": "Millones de pesos (ARS)"
+        },
+        "circulacion": {
+          "provider": "bcra_v4",
+          "id": "16",
+          "agg": "last",
+          "daily": false,
+          "descripcion": "Circulación Monetaria (saldo en millones de ARS)",
+          "frecuencia": "diaria",
+          "unidad": "Millones de pesos (ARS)"
+        },
+        "depositos_efectivo": {
+          "provider": "bcra_v4",
+          "id": "21",
+          "agg": "last",
+          "daily": false,
+          "descripcion": "Depósitos en efectivo en entidades financieras (millones de ARS)",
+          "frecuencia": "diaria",
+          "unidad": "Millones de pesos (ARS)"
+        },
+        "plazo_fijo": {
+          "provider": "bcra_v4",
+          "id": "24",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Depósitos a plazo fijo en entidades financieras (millones de ARS)",
+          "frecuencia": "diaria",
+          "unidad": "Millones de pesos (ARS)"
+        },
+        "m2_privado_ia": {
+          "provider": "bcra_v4",
+          "id": "25",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Variación interanual del promedio móvil de 30 días del M2 privado (%)",
+          "frecuencia": "diaria",
+          "unidad": "Porcentaje (%)"
+        }
+      }
+    },
+    "credito_interno": {
+      "desc_corta": "Préstamos al sector privado en pesos",
+      "fuente": "BCRA (API datos.gob.ar)",
+      "id": "91.1_DETALLE_PRPOT_0_0_25",
+      "field_title": "prestamos_sect_priv_pesos",
+      "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/91/distribution/91.1/download/prestamos-entidades-financieras-sector-privado.csv",
+      "descripcion": "Préstamos al sector privado en pesos. Mensual.",
+      "frecuencia": "mensual",
+      "unidad": "Millones de pesos"
+    },
     "exportaciones": {
       "desc_corta": "Exportaciones Totales (ICA)",
-      "fuente": "INDEC",
+      "fuente": "INDEC (API datos.gob.ar)",
       "id": "74.3_IET_0_M_16",
+      "field_title": "ica_expo_totales",
+      "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
       "descripcion": "Exportaciones totales (FOB). Mensual.",
       "frecuencia": "mensual",
       "unidad": "Millones de dólares estadounidenses (USD)"
     },
     "importaciones": {
       "desc_corta": "Importaciones Totales (ICA)",
-      "fuente": "INDEC",
+      "fuente": "INDEC (API datos.gob.ar)",
       "id": "76.3_ITG_0_M_17",
+      "field_title": "ica_importaciones_totales",
+      "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
       "descripcion": "Importaciones total general (CIF). Mensual.",
       "frecuencia": "mensual",
       "unidad": "Millones de dólares estadounidenses (USD)"
     },
-    "gasto_publico": {
-      "desc_corta": "Gasto Público del Sector Público Nacional (Base Caja)",
-      "fuente": "Secretaría de Hacienda",
+    "ica_detalle": {
+      "desc_corta": "Apertura del Intercambio Comercial Argentino (ICA)",
+      "fuente": "INDEC (API datos.gob.ar)",
       "opciones": {
+        "expo_pp": {
+          "id": "74.3_IEPP_0_M_35",
+          "field_title": "ica_exportacion_productos_primarios",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Exportaciones de Productos Primarios (PP)",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        },
+        "expo_moa": {
+          "id": "74.3_IEMOA_0_M_48",
+          "field_title": "ica_exportacion_manufacturas_origen_agropecuario",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Exportaciones de Manufacturas de Origen Agropecuario (MOA)",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        },
+        "expo_moi": {
+          "id": "74.3_IEMOI_0_M_46",
+          "field_title": "ica_exportacion_manufacturas_origen_industrial",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Exportaciones de Manufacturas de Origen Industrial (MOI)",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        },
+        "expo_cye": {
+          "id": "74.3_IECE_0_M_35",
+          "field_title": "ica_exportacion_combustible_energia",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Exportaciones de Combustibles y Energía (CyE)",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        },
+        "impo_bk": {
+          "id": "74.3_IIBCA_0_M_32",
+          "field_title": "ica_importaciones_bienes_capital",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Importaciones de Bienes de Capital",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        },
+        "impo_bi": {
+          "id": "74.3_IIBI_0_M_36",
+          "field_title": "ica_importaciones_bienes_intermedios",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Importaciones de Bienes Intermedios",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        },
+        "impo_comb": {
+          "id": "74.3_IICL_0_M_42",
+          "field_title": "ica_importaciones_combustibles_lubricantes",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Importaciones de Combustibles y Lubricantes",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        },
+        "impo_bco": {
+          "id": "74.3_IIBCO_0_M_32",
+          "field_title": "ica_importaciones_bienes_consumo",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/74/distribution/74.3/download/intercambio-comercial-argentino-mensual.csv",
+          "descripcion": "Importaciones de Bienes de Consumo",
+          "frecuencia": "mensual",
+          "unidad": "Millones de USD"
+        }
+      }
+    },
+    "sector_externo": {
+      "desc_corta": "Reservas, Tipos de Cambio, ITCRM y Riesgo País",
+      "fuente": "BCRA (API v4.0 y XLSX) / Bluelytics / Ámbito-Rava",
+      "opciones": {
+        "reservas": {
+          "provider": "bcra_v4",
+          "id": "1",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Reservas Internacionales Brutas del BCRA (millones de USD)",
+          "frecuencia": "diaria",
+          "unidad": "Millones de USD"
+        },
+        "tc_mayorista": {
+          "provider": "bcra_v4",
+          "id": "5",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Tipo de cambio mayorista de referencia (Com. A 3500, ARS/USD)",
+          "frecuencia": "diaria",
+          "unidad": "ARS por USD"
+        },
+        "tc_minorista": {
+          "provider": "bcra_v4",
+          "id": "4",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Tipo de cambio minorista promedio vendedor (ARS/USD)",
+          "frecuencia": "diaria",
+          "unidad": "ARS por USD"
+        },
+        "dolar_blue": {
+          "provider": "bluelytics",
+          "id": "Blue",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Cotización Dólar Blue (venta, ARS/USD)",
+          "frecuencia": "diaria",
+          "unidad": "ARS por USD"
+        },
+        "itcrm": {
+          "provider": "xlsx_bcra_itcrm",
+          "id": "ITCRM",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Índice de Tipo de Cambio Real Multilateral (BCRA, base 17/12/15=100)",
+          "frecuencia": "diaria",
+          "unidad": "Índice (17/12/2015 = 100)"
+        },
+        "itcrb_brasil": {
+          "provider": "xlsx_bcra_itcrm",
+          "id": "ITCRB Brasil",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Índice de Tipo de Cambio Real Bilateral con Brasil (base 17/12/15=100)",
+          "frecuencia": "diaria",
+          "unidad": "Índice (17/12/2015 = 100)"
+        },
+        "itcrb_eeuu": {
+          "provider": "xlsx_bcra_itcrm",
+          "id": "ITCRB Estados Unidos",
+          "agg": "mean",
+          "daily": true,
+          "descripcion": "Índice de Tipo de Cambio Real Bilateral con EE.UU. (base 17/12/15=100)",
+          "frecuencia": "diaria",
+          "unidad": "Índice (17/12/2015 = 100)"
+        },
+        "riesgo_pais": {
+          "provider": "scraper_ambito_rava",
+          "id": "riesgo_pais",
+          "agg": "last",
+          "daily": true,
+          "descripcion": "Riesgo País EMBI+ Argentina (JP Morgan, puntos básicos)",
+          "frecuencia": "diaria",
+          "unidad": "Puntos básicos (pb)"
+        }
+      }
+    },
+    "gasto_publico": {
+      "desc_corta": "Esquema Ahorro-Inversión-Financiamiento del SPN (Base Caja)",
+      "fuente": "Secretaría de Hacienda (API datos.gob.ar)",
+      "opciones": {
+        "ingresos_totales": {
+          "id": "372.9_ING_DESPUE017__28_57",
+          "field_title": "ing_despues_figurativos_2017",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/372/distribution/372.9/download/administracion-publica-nacional-valores-mensuales-17.csv",
+          "descripcion": "Ingresos totales después de figurativos (Metodología 2017). Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos argentinos (ARS)"
+        },
         "primario": {
           "id": "372.9_GTOS_PRIMA017__39_31",
+          "field_title": "gtos_primarios_despues_figurativos_2017",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/372/distribution/372.9/download/administracion-publica-nacional-valores-mensuales-17.csv",
           "descripcion": "Gastos primarios después de figurativos (Metodología 2017). Mensual.",
           "frecuencia": "mensual",
           "unidad": "Millones de pesos argentinos (ARS)"
         },
         "total": {
           "id": "372.9_GTOS_DESPU017__29_72",
+          "field_title": "gtos_despues_figurativos_2017",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/372/distribution/372.9/download/administracion-publica-nacional-valores-mensuales-17.csv",
           "descripcion": "Gastos totales después de figurativos (Metodología 2017). Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos argentinos (ARS)"
+        },
+        "resultado_primario": {
+          "id": "372.9_SUPERAVIT_017__23_88",
+          "field_title": "superavit_primario_2017",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/372/distribution/372.9/download/administracion-publica-nacional-valores-mensuales-17.csv",
+          "descripcion": "Resultado primario de la APN (Base Caja, Metodología 2017). Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos argentinos (ARS)"
+        },
+        "resultado_financiero": {
+          "id": "372.9_RESULTADO_017__18_80",
+          "field_title": "resultado_fin_2017",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/372/distribution/372.9/download/administracion-publica-nacional-valores-mensuales-17.csv",
+          "descripcion": "Resultado financiero de la APN (Base Caja, Metodología 2017). Mensual.",
           "frecuencia": "mensual",
           "unidad": "Millones de pesos argentinos (ARS)"
         }
       }
     },
-    "credito_interno": {
-      "desc_corta": "Préstamos al sector privado en pesos",
-      "fuente": "BCRA",
-      "id": "91.1_DETALLE_PRPOT_0_0_25",
-      "descripcion": "Préstamos al sector privado en pesos. Mensual.",
-      "frecuencia": "mensual",
-      "unidad": "Millones de pesos"
+    "recaudacion": {
+      "desc_corta": "Recaudación Tributaria Nacional",
+      "fuente": "ARCA / AFIP - Secretaría de Hacienda (datos.gob.ar)",
+      "opciones": {
+        "total": {
+          "id": "172.3_TL_RECAION_M_0_0_17",
+          "field_title": "total_recaudacion",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/172/distribution/172.3/download/recaudacion-tributaria-datos-mensuales.csv",
+          "descripcion": "Recaudación tributaria total nacional. Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos (ARS)"
+        },
+        "dgi": {
+          "id": "172.3_SOTAL_DDGI_M_0_0_12",
+          "field_title": "subtotal_dgi",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/172/distribution/172.3/download/recaudacion-tributaria-datos-mensuales.csv",
+          "descripcion": "Recaudación DGI (impositiva mercado interno). Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos (ARS)"
+        },
+        "dga": {
+          "id": "172.3_SOTAL_DDGA_M_0_0_12",
+          "field_title": "subtotal_dga",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/172/distribution/172.3/download/recaudacion-tributaria-datos-mensuales.csv",
+          "descripcion": "Recaudación DGA (Aduana / Comercio Exterior). Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos (ARS)"
+        },
+        "seg_social": {
+          "id": "172.3_SRIDAD_IAL_M_0_0_16",
+          "field_title": "seguridad_social",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/172/distribution/172.3/download/recaudacion-tributaria-datos-mensuales.csv",
+          "descripcion": "Recaudación Seguridad Social. Mensual.",
+          "frecuencia": "mensual",
+          "unidad": "Millones de pesos (ARS)"
+        }
+      }
     },
     "salarios": {
       "desc_corta": "Remuneración imponible promedio de los trabajadores estables (RIPTE)",
       "fuente": "Secretaría de Trabajo, Empleo y Seguridad Social",
       "id": "158.1_REPTE_0_0_5",
+      "field_title": "ripte",
+      "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/158/distribution/158.1/download/remuneracion-imponible-promedio-trabajadores-estables-ripte-total-pais-pesos-serie-mensual.csv",
       "descripcion": "RIPTE. Mensual.",
       "frecuencia": "mensual",
       "unidad": "Pesos corrientes"
+    },
+    "salarios_indec": {
+      "desc_corta": "Índice de Salarios por Sector (INDEC)",
+      "fuente": "INDEC (API datos.gob.ar)",
+      "opciones": {
+        "total": {
+          "id": "149.1_TL_INDIIOS_OCTU_0_21",
+          "field_title": "indice_salarios",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/149/distribution/149.1/download/indice-salarios-periodicidad-mensual-base-octubre-2016.csv",
+          "descripcion": "Índice de Salarios Total (Base oct 2016 = 100)",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Oct 2016 = 100)"
+        },
+        "privado_registrado": {
+          "id": "149.1_SOR_PRIADO_OCTU_0_25",
+          "field_title": "indice_salarios_registrado_sector_privado",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/149/distribution/149.1/download/indice-salarios-periodicidad-mensual-base-octubre-2016.csv",
+          "descripcion": "Índice de Salarios. Sector privado registrado (Base oct 2016 = 100)",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Oct 2016 = 100)"
+        },
+        "publico": {
+          "id": "149.1_SOR_PUBICO_OCTU_0_14",
+          "field_title": "indice_salarios_registrado_sector_publico",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/149/distribution/149.1/download/indice-salarios-periodicidad-mensual-base-octubre-2016.csv",
+          "descripcion": "Índice de Salarios. Sector público (Base oct 2016 = 100)",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Oct 2016 = 100)"
+        },
+        "no_registrado": {
+          "id": "149.1_SOR_PRIADO_OCTU_0_28",
+          "field_title": "indice_salarios_no_registrado_sector_privado",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/149/distribution/149.1/download/indice-salarios-periodicidad-mensual-base-octubre-2016.csv",
+          "descripcion": "Índice de Salarios. Sector privado no registrado / informal (Base oct 2016 = 100)",
+          "frecuencia": "mensual",
+          "unidad": "Índice (Base Oct 2016 = 100)"
+        }
+      }
+    },
+    "social": {
+      "desc_corta": "Canastas Básicas, Mercado Laboral y Pobreza (EPH)",
+      "fuente": "INDEC / GCBA (API datos.gob.ar)",
+      "opciones": {
+        "cba": {
+          "id": "444.1_CANASTA_BARIA_0_0_26_47",
+          "field_title": "canasta_basica_alimentaria",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/444/distribution/444.1/download/canastas-basicas-ciudad-de-buenos-aires.csv",
+          "descripcion": "Canasta Básica Alimentaria (Línea de Indigencia)",
+          "frecuencia": "mensual",
+          "unidad": "Pesos corrientes (ARS)"
+        },
+        "cbt": {
+          "id": "444.1_CANASTA_BATAL_0_0_20_94",
+          "field_title": "canasta_basica_total",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/444/distribution/444.1/download/canastas-basicas-ciudad-de-buenos-aires.csv",
+          "descripcion": "Canasta Básica Total (Línea de Pobreza)",
+          "frecuencia": "mensual",
+          "unidad": "Pesos corrientes (ARS)"
+        },
+        "desocupacion": {
+          "id": "45.2_ECTDT_0_T_33",
+          "field_title": "eph_continua_tasa_desempleo_total",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/45/distribution/45.2/download/tasa-desempleo-valores-trimestrales.csv",
+          "descripcion": "Tasa de desocupación total (EPH continua, trimestral)",
+          "frecuencia": "trimestral",
+          "unidad": "Porcentaje (%)"
+        },
+        "empleo": {
+          "id": "44.2_ECTET_0_T_30",
+          "field_title": "eph_continua_tasa_empleo_total",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/44/distribution/44.2/download/tasa-empleo-valores-trimestrales.csv",
+          "descripcion": "Tasa de empleo total (EPH continua, trimestral)",
+          "frecuencia": "trimestral",
+          "unidad": "Porcentaje (%)"
+        },
+        "actividad": {
+          "id": "43.2_ECTAT_0_T_33",
+          "field_title": "eph_continua_tasa_actividad_total",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/43/distribution/43.2/download/tasa-actividad-valores-trimestrales.csv",
+          "descripcion": "Tasa de actividad total (EPH continua, trimestral)",
+          "frecuencia": "trimestral",
+          "unidad": "Porcentaje (%)"
+        },
+        "pobreza_personas": {
+          "id": "64.2_POBLACION_NUA_0_0_32_52",
+          "field_title": "poblacion_pobre_pct_total_continua",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/64/distribution/64.2/download/poblacion-con-ingresos-por-debajo-linea-pobreza-eph-continua.csv",
+          "descripcion": "Incidencia de la pobreza en personas (EPH continua, %)",
+          "frecuencia": "semestral",
+          "unidad": "Porcentaje (%)"
+        },
+        "pobreza_hogares": {
+          "id": "63.2_HOGARES_PONUA_0_0_33_21",
+          "field_title": "hogares_pobres_pct_total_continua",
+          "csv_url": "https://infra.datos.gob.ar/catalog/sspm/dataset/63/distribution/63.2/download/hogares-con-ingresos-por-debajo-linea-pobreza-eph-continua.csv",
+          "descripcion": "Incidencia de la pobreza en hogares (EPH continua, %)",
+          "frecuencia": "semestral",
+          "unidad": "Porcentaje (%)"
+        }
+      }
     }
   }
 }

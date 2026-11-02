@@ -8,13 +8,13 @@ from __future__ import annotations
 import logging
 import os
 
-from dash import Dash, Input, Output, State, callback, ctx, dcc, html, no_update
+from dash import Dash, Input, Output, callback, ctx, dcc, html, no_update
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import ui.theme  # noqa: F401  (registra el template de Plotly)
-from pipeline import ERROR, FROM_CACHE, CSV_FALLBACK, MacroData, get_macro_data
-from ui.format import fmt_ago, fmt_month
-from views import resumen
+from pipeline import CSV_FALLBACK, ERROR, FROM_CACHE, MacroData, get_macro_data
+from ui.format import fmt_ago, fmt_day, fmt_month
+from views import actividad, alta_frecuencia, datos, dinero, externo, fiscal, precios, resumen
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -41,12 +41,13 @@ RANGE_OPTIONS = [
 
 TABS = [
     ("resumen", "Resumen", False),
-    ("actividad", "Actividad", True),
-    ("precios", "Precios y tasas", True),
-    ("externo", "Sector externo", True),
-    ("fiscal", "Fiscal", True),
-    ("dinero", "Dinero, crédito y salarios", True),
-    ("datos", "Datos y metodología", True),
+    ("alta_frecuencia", "Alta frecuencia (diario)", False),
+    ("actividad", "Actividad", False),
+    ("precios", "Precios y tasas", False),
+    ("externo", "Sector externo", False),
+    ("fiscal", "Fiscal", False),
+    ("dinero", "Dinero, crédito y salarios", False),
+    ("datos", "Datos y metodología", False),
 ]
 
 STATUS_LABEL = {
@@ -68,7 +69,8 @@ def header() -> html.Header:
                     html.Div([html.Span(), html.Span(), html.Span()], className="flag", **{"aria-hidden": "true"}),
                     html.Div(
                         [html.H1("Macro Argentina", className="brand-title"),
-                         html.Span("Tablero de coyuntura · API Series de Tiempo (datos.gob.ar)", className="brand-sub")],
+                         html.Span("Tablero de coyuntura · APIs Oficiales (datos.gob.ar, BCRA v4), XLS y Scraping",
+                                   className="brand-sub")],
                     ),
                 ],
                 className="brand",
@@ -83,7 +85,7 @@ def header() -> html.Header:
                     ),
                     html.Div(id="data-status", className="status"),
                     html.Button("↻ Actualizar", id="refresh", n_clicks=0, className="btn",
-                                title="Forzar descarga desde la API"),
+                                title="Forzar descarga desde las fuentes remotas"),
                 ],
                 className="toolbar",
             ),
@@ -112,9 +114,9 @@ app.layout = html.Div(
             className="main",
         ),
         html.Footer(
-            ["Fuentes: INDEC, BCRA, Secretaría de Hacienda y Secretaría de Trabajo, vía ",
+            ["Fuentes: INDEC, BCRA (API v4.0 + ITCRM XLSX), Secretaría de Hacienda, Secretaría de Trabajo, ",
              html.A("apis.datos.gob.ar", href="https://apis.datos.gob.ar/series/api/docs/", target="_blank"),
-             ". Los valores reales se expresan a precios del último IPC publicado."],
+             ", Bluelytics, DolarAPI y Ámbito/Rava. Los valores reales se expresan a precios del último IPC publicado."],
             className="footer",
         ),
     ],
@@ -129,12 +131,18 @@ def status_view(data: MacroData) -> html.Details:
     n_ok, n_tot = data.n_ok, data.n_total
     degraded = any(s["estado"] != "ok" for s in data.series_status.values())
     level = "bad" if data.source == "cache_desactualizada" or n_ok < n_tot else ("warn" if degraded else "good")
-    last = max((s.get("ultimo_dato") or "" for s in data.series_status.values()), default="")
+    last = max(
+        (s.get("ultimo_dato") or "" for s in data.series_status.values() if s.get("frequency", "M") == "M"),
+        default="",
+    )
     rows = [
         html.Tr([
             html.Td(col.replace("_", " ")),
             html.Td(STATUS_LABEL.get(s["estado"], s["estado"]), className=f"st st--{s['estado']}"),
-            html.Td(fmt_month(s.get("ultimo_dato")) if s.get("ultimo_dato") else "—"),
+            html.Td(
+                (fmt_day(s.get("ultimo_dato")) if s.get("frequency") == "D" else fmt_month(s.get("ultimo_dato")))
+                if s.get("ultimo_dato") else "—"
+            ),
         ], title=s.get("detalle") or s.get("descripcion", ""))
         for col, s in data.series_status.items()
     ]
@@ -148,9 +156,9 @@ def status_view(data: MacroData) -> html.Details:
             html.Div(
                 [
                     html.Div([html.Strong("Origen: "),
-                              {"api": "API (recién descargado)", "cache": "Caché local",
-                               "cache_desactualizada": "Caché local (API no disponible)"}[data.source]]),
-                    html.Div([html.Strong("Último período con datos: "), fmt_month(last) if last else "—"]),
+                              {"api": "Fuentes en vivo (recién descargado)", "cache": "Caché local",
+                               "cache_desactualizada": "Caché local (sin conexión remota)"}[data.source]]),
+                    html.Div([html.Strong("Último período mensual: "), fmt_month(last) if last else "—"]),
                     html.Table([html.Thead(html.Tr([html.Th("Serie"), html.Th("Estado"), html.Th("Último dato")])),
                                 html.Tbody(rows)], className="status-table"),
                 ],
@@ -164,7 +172,7 @@ def status_view(data: MacroData) -> html.Details:
 def banner_view(data: MacroData):
     if data.source == "cache_desactualizada":
         return html.Div(
-            f"No se pudo conectar con la API de datos.gob.ar. Se muestran datos guardados {fmt_ago(data.fetched_at)}.",
+            f"No se pudo conectar con las fuentes remotas. Se muestran datos guardados {fmt_ago(data.fetched_at)}.",
             className="banner banner--warn",
         )
     failed = [c for c, s in data.series_status.items() if s["estado"] == ERROR]
@@ -176,6 +184,18 @@ def banner_view(data: MacroData):
 # --------------------------------------------------------------------------- #
 # Callbacks
 # --------------------------------------------------------------------------- #
+VIEW_MAP = {
+    "resumen": resumen.layout,
+    "alta_frecuencia": alta_frecuencia.layout,
+    "actividad": actividad.layout,
+    "precios": precios.layout,
+    "externo": externo.layout,
+    "fiscal": fiscal.layout,
+    "dinero": dinero.layout,
+    "datos": datos.layout,
+}
+
+
 @callback(
     Output("tab-content", "children"),
     Output("data-status", "children"),
@@ -196,11 +216,33 @@ def render(tab: str, years: int, _clicks: int):
         msg = html.Div(f"No se pudieron obtener datos y no hay caché local: {e}", className="banner banner--bad")
         return html.Div(), no_update, msg
 
-    if tab == "resumen":
-        content = resumen.layout(data, years or None)
-    else:
-        content = html.Div("Próximamente.", className="empty-state")
+    view_fn = VIEW_MAP.get(tab, resumen.layout)
+    content = view_fn(data, years or None)
     return content, status_view(data), banner_view(data)
+
+
+@callback(
+    Output("download-monthly-csv", "data"),
+    Input("btn-download-monthly", "n_clicks"),
+    prevent_initial_call=True,
+)
+def download_monthly_csv(n_clicks: int):
+    if not n_clicks:
+        return no_update
+    data = get_macro_data(force=False)
+    return dcc.send_data_frame(data.df.to_csv, "macro_argentina_mensual.csv", index=False)
+
+
+@callback(
+    Output("download-daily-csv", "data"),
+    Input("btn-download-daily", "n_clicks"),
+    prevent_initial_call=True,
+)
+def download_daily_csv(n_clicks: int):
+    if not n_clicks:
+        return no_update
+    data = get_macro_data(force=False)
+    return dcc.send_data_frame(data.daily_df.to_csv, "macro_argentina_diario.csv", index=False)
 
 
 if __name__ == "__main__":

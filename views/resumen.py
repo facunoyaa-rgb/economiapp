@@ -15,7 +15,7 @@ HOVER_PCT = "%{y:.2f}%"
 
 
 def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if not years:
+    if not years or df.empty:
         return df
     start = df["Fecha"].max() - pd.DateOffset(years=years)
     return df[df["Fecha"] > start]
@@ -23,7 +23,10 @@ def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
 
 def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """Recorta filas iniciales/finales donde todas las columnas son nulas."""
-    mask = df[cols].notna().any(axis=1)
+    present = [c for c in cols if c in df]
+    if not present:
+        return df.iloc[0:0]
+    mask = df[present].notna().any(axis=1)
     if not mask.any():
         return df.iloc[0:0]
     return df.loc[mask.idxmax(): mask[::-1].idxmax()]
@@ -41,6 +44,9 @@ def fig_inflacion_vs_tasa(df: pd.DataFrame) -> go.Figure | None:
                 marker_color=COLORS["bad"], marker_opacity=0.75, hovertemplate=HOVER_PCT)
     fig.add_scatter(x=d["Fecha"], y=d["Tasa_Nominal_Mensual_Pct"], name="Tasa plazo fijo mensual (TNA/12)",
                     mode="lines", line=dict(color=SERIES[0], width=2.2), hovertemplate=HOVER_PCT)
+    if "Crawling_Peg_Mensual_Pct" in d and d["Crawling_Peg_Mensual_Pct"].notna().any():
+        fig.add_scatter(x=d["Fecha"], y=d["Crawling_Peg_Mensual_Pct"], name="Devaluación mensual (TC Mayorista)",
+                        mode="lines", line=dict(color=SERIES[1], width=1.6, dash="dot"), hovertemplate=HOVER_PCT)
     fig.update_yaxes(ticksuffix="%", title_text="% mensual")
     fig.update_xaxes(hoverformat="%b %Y")
     return fig
@@ -55,7 +61,6 @@ def fig_base100(df: pd.DataFrame) -> tuple[go.Figure | None, pd.Timestamp | None
     cols = {c: n for c, n in cols.items() if c in df and df[c].notna().any()}
     if not cols:
         return None, None
-    # Base común: primer mes en que todas las series tienen dato dentro de la ventana
     base_date = max(df.loc[df[c].notna(), "Fecha"].min() for c in cols)
     d = df[df["Fecha"] >= base_date]
     fig = go.Figure()
@@ -87,6 +92,56 @@ def fig_saldo_comercial(df: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
+def fig_reservas_y_riesgo(df: pd.DataFrame) -> go.Figure | None:
+    d = _trim(df, ["Reservas_BCRA", "Riesgo_Pais"])
+    if d.empty:
+        return None
+    fig = go.Figure()
+    if "Reservas_BCRA" in d and d["Reservas_BCRA"].notna().any():
+        fig.add_scatter(
+            x=d["Fecha"], y=d["Reservas_BCRA"], name="Reservas Brutas BCRA (USD M)",
+            mode="lines", line=dict(color=SERIES[2], width=2.2), hovertemplate="US$ %{y:,.0f} M",
+        )
+    if "Riesgo_Pais" in d and d["Riesgo_Pais"].notna().any():
+        fig.add_scatter(
+            x=d["Fecha"], y=d["Riesgo_Pais"], name="Riesgo País (pb, eje der.)",
+            mode="lines", line=dict(color=SERIES[3], width=1.8, dash="dot"),
+            yaxis="y2", hovertemplate="%{y:,.0f} pb",
+        )
+    fig.update_layout(
+        yaxis=dict(title=dict(text="Reservas (USD M)")),
+        yaxis2=dict(
+            title=dict(text="Riesgo País (pb)", font=dict(color=COLORS["muted"], size=11)),
+            overlaying="y", side="right", showgrid=False, tickfont=dict(color=COLORS["muted"]),
+        ),
+    )
+    fig.update_xaxes(hoverformat="%b %Y")
+    return fig
+
+
+def fig_resultado_fiscal(df: pd.DataFrame) -> go.Figure | None:
+    d = _trim(df, ["Resultado_Primario_Base_Caja_Real", "Resultado_Financiero_Base_Caja_Real"])
+    if d.empty:
+        return None
+    fig = go.Figure()
+    if "Resultado_Primario_Base_Caja_Real" in d:
+        s_p = d["Resultado_Primario_Base_Caja_Real"] / 1e6
+        colors = [COLORS["good"] if (v or 0) >= 0 else COLORS["bad"] for v in s_p.fillna(0)]
+        fig.add_bar(
+            x=d["Fecha"], y=s_p, name="Resultado Primario Real",
+            marker_color=colors, marker_opacity=0.8, hovertemplate="$ %{y:,.2f} billones",
+        )
+    if "Resultado_Primario_Real_12m" in d and d["Resultado_Primario_Real_12m"].notna().any():
+        fig.add_scatter(
+            x=d["Fecha"], y=d["Resultado_Primario_Real_12m"] / 1e6,
+            name="Acumulado 12 meses (Primario)", mode="lines",
+            line=dict(color=SERIES[0], width=2.2), hovertemplate="$ %{y:,.2f} billones",
+        )
+    fig.update_yaxes(title_text="Billones de ARS constantes")
+    fig.update_xaxes(hoverformat="%b %Y")
+    return fig
+
+
 # --------------------------------------------------------------------------- #
 # Layout
 # --------------------------------------------------------------------------- #
@@ -104,6 +159,8 @@ def layout(data: MacroData, years: int | None) -> html.Div:
     f_infl = fig_inflacion_vs_tasa(win)
     f_b100, base_date = fig_base100(win)
     f_saldo = fig_saldo_comercial(win)
+    f_res = fig_reservas_y_riesgo(win)
+    f_fis = fig_resultado_fiscal(win)
 
     b100_note = None
     if base_date is not None and win["Fecha"].min() < base_date:
@@ -114,7 +171,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
         [
             html.Section(
                 [html.H2("Indicadores clave", className="section-title"),
-                 html.Span("Último dato publicado de cada serie", className="section-hint")],
+                 html.Span("Último dato mensual publicado de cada serie", className="section-hint")],
                 className="section-head",
             ),
             kpi_grid(build_kpis(df)),
@@ -123,9 +180,9 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                     card(insight_list(build_insights(df)), "Lectura rápida",
                          "Generada automáticamente a partir de los últimos datos.", className="span-1"),
                     _chart_or_empty(
-                        f_infl, "Inflación vs. tasa de plazo fijo",
-                        "Ambas en % mensual. Si la línea supera a las barras, la tasa real es positiva.",
-                        "Fuente: INDEC (IPC) y BCRA (plazo fijo 30-59 días).", className="span-2"),
+                        f_infl, "Inflación, tasa de interés y crawling peg",
+                        "En % mensual. Si la tasa supera a la inflación, el rendimiento real ex-post es positivo.",
+                        "Fuente: INDEC (IPC) y BCRA (plazo fijo 30-59 días y TC Mayorista A3500).", className="span-2"),
                 ],
                 className="grid-3",
             ),
@@ -139,6 +196,19 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                         f_saldo, "Comercio exterior",
                         "Exportaciones, importaciones y saldo mensual.",
                         "Fuente: INDEC, Intercambio Comercial Argentino (ICA)."),
+                ],
+                className="grid-2",
+            ),
+            html.Div(
+                [
+                    _chart_or_empty(
+                        f_res, "Reservas Internacionales y Riesgo País",
+                        "Stock de reservas brutas del BCRA (eje izq.) y sobretasa soberana EMBI+ (eje der.).",
+                        "Fuente: BCRA (API v4.0) y Scraping Ámbito / Rava Bursátil."),
+                    _chart_or_empty(
+                        f_fis, "Resultado Fiscal Primario (real)",
+                        "Resultado mensual y acumulado de 12 meses a precios del último IPC.",
+                        "Fuente: Secretaría de Hacienda (Esquema Ahorro-Inversión-Financiamiento Base Caja)."),
                 ],
                 className="grid-2",
             ),

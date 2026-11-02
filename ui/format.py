@@ -27,6 +27,11 @@ def fmt_num(x, dec: int = 1, signed: bool = False) -> str:
     return s
 
 
+def fmt_int(x, signed: bool = False) -> str:
+    """Formatea un entero con separador de miles es-AR."""
+    return fmt_num(x, 0, signed=signed)
+
+
 def fmt_pct(x, dec: int = 1, signed: bool = False) -> str:
     """Valor ya expresado en porcentaje: 1.66 -> '1,7%'."""
     return DASH if _missing(x) else f"{fmt_num(x, dec, signed)}%"
@@ -68,6 +73,15 @@ def fmt_month(ts) -> str:
         return DASH
     ts = pd.Timestamp(ts)
     return f"{MESES[ts.month - 1]} {ts.year}"
+
+
+def fmt_day(ts) -> str:
+    """Timestamp -> '28 oct 2026'."""
+    if _missing(ts):
+        return DASH
+    ts = pd.Timestamp(ts)
+    return f"{ts.day:02d} {MESES[ts.month - 1]} {ts.year}"
+
 
 
 def fmt_month_short(ts) -> str:
