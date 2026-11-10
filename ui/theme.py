@@ -37,11 +37,14 @@ _template = go.layout.Template(
         margin=dict(l=8, r=8, t=8, b=8),
         legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0,
                     font=dict(color=COLORS["muted"], size=11), bgcolor="rgba(0,0,0,0)"),
+        # automargin: Plotly reserva el espacio que necesitan las etiquetas y títulos de cada eje
+        # (con margen fijo de 8 px quedaban recortadas fuera del gráfico).
         xaxis=dict(showgrid=False, linecolor=COLORS["border"], tickcolor=COLORS["border"],
-                   tickfont=dict(color=COLORS["muted"]), zeroline=False, ticks="outside", ticklen=4),
+                   tickfont=dict(color=COLORS["muted"]), zeroline=False, ticks="outside", ticklen=4,
+                   automargin=True),
         yaxis=dict(gridcolor=COLORS["grid"], linecolor=COLORS["border"], tickfont=dict(color=COLORS["muted"]),
                    zeroline=True, zerolinecolor=COLORS["border"], zerolinewidth=1, separatethousands=True,
-                   title=dict(font=dict(color=COLORS["muted"], size=11))),
+                   title=dict(font=dict(color=COLORS["muted"], size=11), standoff=8), automargin=True),
         separators=",.",  # decimal ',' y miles '.' (es-AR)
         bargap=0.25,
     ),

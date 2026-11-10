@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import html
 
-from indicators import build_externo_kpis
+from indicators import build_externo_kpis, real_base_month
 from pipeline import MacroData
 from ui.components import card, chart_card, empty_state, kpi_grid
 from ui.theme import COLORS, SERIES
@@ -126,7 +126,7 @@ def fig_tc_real_y_brecha(df: pd.DataFrame) -> go.Figure | None:
             marker_color=SERIES[3], marker_opacity=0.35, yaxis="y2", hovertemplate="%{y:.1f}%",
         )
     fig.update_layout(
-        yaxis=dict(title=dict(text="ARS constantes del último IPC")),
+        yaxis=dict(title=dict(text=f"$ de {real_base_month(df)} por USD")),
         yaxis2=dict(
             title=dict(text="Brecha (%)", font=dict(color=COLORS["muted"], size=11)),
             overlaying="y", side="right", showgrid=False, ticksuffix="%",
@@ -156,7 +156,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
     return html.Div(
         [
             html.Section(
-                [html.H2("Sector Externo, Tipo de Cambio y Competitividad", className="section-title"),
+                [html.H2("Sector externo, tipo de cambio y competitividad", className="section-title"),
                  html.Span("Intercambio comercial por rubros (ICA), Balanza Energética, Reservas, ITCRM y Brecha",
                            className="section-hint")],
                 className="section-head",
@@ -165,7 +165,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_exp, "Exportaciones por grandes rubros y Balanza Energética",
+                        f_exp, "Exportaciones por grandes rubros y balanza energética",
                         "Barras apiladas: PP, MOA, MOI y Combustibles. Línea blanca: Saldo comercial energético.",
                         "Fuente: INDEC, Intercambio Comercial Argentino (ICA)."),
                     _chart_or_empty(
@@ -178,13 +178,13 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_itc, "Competitividad cambiaria: ITCRM Multilateral y Bilaterales",
+                        f_itc, "Competitividad cambiaria: ITCRM multilateral y bilaterales",
                         "Índice de Tipo de Cambio Real Multilateral y bilaterales con Brasil y EE.UU. (17/12/2015 = 100).",
                         "Fuente: BCRA (Planilla oficial ITCRMSerie.xlsx)."),
                     _chart_or_empty(
-                        f_tcr, "Dólar Oficial y Libre a precios constantes (IPC) y Brecha Cambiaria",
+                        f_tcr, "Dólar oficial y libre a precios constantes (IPC) y brecha cambiaria",
                         "Cotizaciones históricas expresadas en pesos de poder adquisitivo actual y brecha porcentual.",
-                        "Fuente: BCRA (API v4.0), Bluelytics e INDEC (IPC)."),
+                        "Fuente: BCRA, Bluelytics e INDEC (IPC)."),
                 ],
                 className="grid-2",
             ),

@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import html
 
-from indicators import build_precios_kpis
+from indicators import build_precios_kpis, real_base_month
 from pipeline import MacroData
 from ui.components import card, chart_card, empty_state, kpi_grid
 from ui.format import fmt_month
@@ -143,7 +143,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
     return html.Div(
         [
             html.Section(
-                [html.H2("Precios, Expectativas y Estructura de Tasas", className="section-title"),
+                [html.H2("Precios, expectativas y estructura de tasas", className="section-title"),
                  html.Span("Aperturas del IPC Nacional, precios mayoristas (IPIM), REM del BCRA y tasas pasivas/activas",
                            className="section-hint")],
                 className="section-head",
@@ -158,7 +158,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                     _chart_or_empty(
                         f_mmr, "Inflación minorista, mayorista (IPIM) y expectativas (REM)",
                         "Variación interanual del IPC y del IPIM frente a la inflación esperada a 12 meses del REM.",
-                        "Fuente: INDEC (IPC e IPIM) y BCRA (Relevamiento de Expectativas de Mercado, API v4.0)."),
+                        "Fuente: INDEC (IPC e IPIM) y BCRA (Relevamiento de Expectativas de Mercado)."),
                 ],
                 className="grid-2",
             ),
@@ -167,11 +167,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                     _chart_or_empty(
                         f_tas, "Estructura de tasas de interés pasivas y activas (TNA %)",
                         "Tasas de depósitos (Plazo Fijo, BADLAR, TAMAR) vs. costo del crédito (Adelantos y Personales).",
-                        "Fuente: BCRA (datos.gob.ar y API Estadísticas v4.0)."),
+                        "Fuente: BCRA (vía datos.gob.ar y API de Estadísticas)."),
                     _chart_or_empty(
-                        f_rea, "Rendimiento real del peso: Ex-Post (IPC) y Ex-Ante (REM 12m)",
+                        f_rea, "Rendimiento real del peso: ex-post (IPC) y ex-ante (REM 12 m)",
                         "Barras: tasa real mensual observada (Fisher). Línea: tasa anualizada contra inflación esperada REM.",
-                        f"Fuente: Elaboración propia sobre datos de INDEC y BCRA (último IPC: {fmt_month(df['Fecha'].max())})."),
+                        f"Fuente: Elaboración propia sobre datos de INDEC y BCRA (último IPC: {real_base_month(df)})."),
                 ],
                 className="grid-2",
             ),

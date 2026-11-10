@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import html
 
-from indicators import build_dinero_kpis
+from indicators import build_dinero_kpis, real_base_month
 from pipeline import MacroData
 from ui.components import card, chart_card, empty_state, kpi_grid
 from ui.theme import COLORS, SERIES
@@ -44,7 +44,7 @@ def fig_agregados_monetarios_reales(df: pd.DataFrame) -> go.Figure | None:
                 x=d["Fecha"], y=d[col], name=label, mode="lines",
                 line=dict(color=color, width=w), hovertemplate="$ %{y:,.0f} M",
             )
-    fig.update_yaxes(title_text="Millones de ARS constantes")
+    fig.update_yaxes(title_text=f"Millones de $ de {real_base_month(df)}")
     fig.update_xaxes(hoverformat="%b %Y")
     return fig
 
@@ -71,7 +71,7 @@ def fig_credito_vs_depositos_reales(df: pd.DataFrame) -> go.Figure | None:
             hovertemplate="%{y:.1f}%",
         )
     fig.update_layout(
-        yaxis=dict(title=dict(text="Millones de ARS constantes")),
+        yaxis=dict(title=dict(text=f"Millones de $ de {real_base_month(df)}")),
         yaxis2=dict(
             title=dict(text="Préstamos / Depósitos (%)", font=dict(color=COLORS["muted"], size=11)),
             overlaying="y", side="right", showgrid=False, ticksuffix="%",
@@ -164,7 +164,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
     return html.Div(
         [
             html.Section(
-                [html.H2("Dinero, Crédito, Salarios e Indicadores Sociales", className="section-title"),
+                [html.H2("Dinero, crédito, salarios e indicadores sociales", className="section-title"),
                  html.Span("Agregados monetarios reales, intermediación financiera, poder adquisitivo y mercado laboral",
                            className="section-hint")],
                 className="section-head",
@@ -173,24 +173,24 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_mon, "Agregados Monetarios Reales (Base, Circulación y Plazos Fijos)",
+                        f_mon, "Agregados monetarios reales (base, circulación y plazos fijos)",
                         "Saldos nominales deflactados a pesos constantes del último IPC publicado.",
-                        "Fuente: BCRA (API Estadísticas Monetarias v4.0) e INDEC (IPC)."),
+                        "Fuente: BCRA e INDEC (IPC)."),
                     _chart_or_empty(
-                        f_cre, "Intermediación Financiera: Crédito vs. Depósitos Reales en Pesos",
+                        f_cre, "Intermediación financiera: crédito y depósitos reales en pesos",
                         "Stock de préstamos y depósitos privados en ARS constantes y ratio Préstamos/Depósitos.",
-                        "Fuente: BCRA (API v4.0) e INDEC."),
+                        "Fuente: BCRA e INDEC."),
                 ],
                 className="grid-2",
             ),
             html.Div(
                 [
                     _chart_or_empty(
-                        f_sal, "Carrera Salarial Real por Sector (Índice Base 100 = inicio del período)",
+                        f_sal, "Salario real por sector (base 100 = inicio del período)",
                         "Poder adquisitivo comparado entre RIPTE, Privado Registrado, Público e Informal.",
                         "Fuente: Secretaría de Trabajo (RIPTE) e INDEC (Índice de Salarios e IPC)."),
                     _chart_or_empty(
-                        f_lab, "Desocupación, Pobreza (EPH) y Cobertura Salarial de la Canasta Básica",
+                        f_lab, "Desocupación, pobreza (EPH) y cobertura de la canasta básica",
                         "Tasas socioeconómicas (eje izq.) y cantidad de CBT individuales cubiertas por un RIPTE (eje der.).",
                         "Fuente: INDEC (EPH, Valorización de Canastas) y Secretaría de Trabajo."),
                 ],

@@ -19,6 +19,7 @@ from ui.format import (
     fmt_num,
     fmt_pct,
     fmt_pp,
+    fmt_quote_time,
     fmt_usd_millions,
 )
 
@@ -31,8 +32,14 @@ SPARK_DAYS = 45
 
 @dataclass
 class Delta:
+    """Línea de variación de un KPI.
+
+    `sentiment` es el juicio (colorea el texto); `trend` es la variación numérica cuyo
+    signo decide la flecha (▲ sube / ▼ baja). Sin `trend` no se dibuja flecha (niveles).
+    """
     text: str
     sentiment: Sentiment = "neutral"
+    trend: float | None = None
 
 
 @dataclass
@@ -46,6 +53,7 @@ class KPI:
     spark_kind: Literal["line", "bar"] = "line"
     help: str = ""
     available: bool = True
+    note: str = ""  # p. ej. base de precios de un valor real: "pesos de sep 2026"
 
 
 # --------------------------------------------------------------------------- #
@@ -128,13 +136,36 @@ def sign_sentiment(x: float | None) -> Sentiment:
     return "good" if x > 0 else "bad"
 
 
+def real_base_month(df: pd.DataFrame) -> str:
+    """Mes del último IPC publicado: base de todos los valores reales ('sep 2026')."""
+    lo = last_obs(df, "IPC_Nivel_General")
+    return fmt_month(lo[0]) if lo else "último IPC"
+
+
+def real_note(df: pd.DataFrame) -> str:
+    return f"pesos de {real_base_month(df)}"
+
+
 def spark(df: pd.DataFrame, col: str, months: int = SPARK_MONTHS) -> list[float]:
     s = _series(df, col).dropna()
     return [float(v) for v in s.iloc[-months:]]
 
 
 def _pct_delta(label: str, value: float | None, direction: Direction) -> Delta:
-    return Delta(f"{fmt_pct(value, 1, signed=True)} {label}", sentiment(value, direction))
+    return Delta(f"{fmt_pct(value, 1, signed=True)} {label}", sentiment(value, direction), value)
+
+
+def _seasonal_mom_delta(df: pd.DataFrame, col: str) -> Delta:
+    """Para series originales (con estacionalidad) no se compara contra el mes anterior:
+    se muestra la variación interanual del mes previo, que sí es comparable."""
+    lo = last_obs(df, col)
+    if lo is None:
+        return Delta("")
+    prev_date = lo[0] - pd.DateOffset(months=1)
+    yoy_prev = change_pct(df, col, 12, at=prev_date)
+    if yoy_prev is None:
+        return Delta("Serie sin desestacionalizar")
+    return Delta(f"{fmt_pct(yoy_prev, 1, signed=True)} i.a. en {fmt_month(prev_date)}")
 
 
 def _missing_kpi(key: str, title: str, help_: str = "") -> KPI:
@@ -166,7 +197,7 @@ def kpi_inflacion(df: pd.DataFrame) -> KPI:
         return _missing_kpi("ipc", title, help_)
     d = change_pp(df, "Inflacion_Mensual_Pct")
     yoy = value_at(df, "Inflacion_Interanual_Pct", lo[0])
-    deltas = [Delta(f"{fmt_pp(d)} vs. mes anterior", sentiment(d, "down"))]
+    deltas = [Delta(f"{fmt_pp(d)} vs. mes anterior", sentiment(d, "down"), d)]
     if yoy is not None:
         deltas.append(Delta(f"Interanual: {fmt_pct(yoy, 1)}"))
     return KPI("ipc", title, fmt_pct(lo[1], 2), fmt_month(lo[0]), deltas,
@@ -181,7 +212,7 @@ def kpi_tasa_nominal(df: pd.DataFrame) -> KPI:
     d = change_pp(df, "Tasa_Interes_Nominal")
     tem = value_at(df, "Tasa_Nominal_Mensual_Pct", lo[0])
     return KPI("tna", title, fmt_pct(lo[1], 1), fmt_month(lo[0]),
-               [Delta(f"{fmt_pp(d)} vs. mes anterior"), Delta(f"Mensual (TEM): {fmt_pct(tem, 2)}")],
+               [Delta(f"{fmt_pp(d)} vs. mes anterior", trend=d), Delta(f"Mensual (TEM): {fmt_pct(tem, 2)}")],
                spark(df, "Tasa_Interes_Nominal"), help=help_)
 
 
@@ -194,7 +225,7 @@ def kpi_tasa_real(df: pd.DataFrame) -> KPI:
     d = change_pp(df, "Tasa_Interes_Real_Mensual_Exacta")
     return KPI("treal", title, f"{fmt_pct(lo[1], 2, signed=True)} mensual", fmt_month(lo[0]),
                [Delta(f"Anualizada: {fmt_pct(anual, 1, signed=True)}", sign_sentiment(anual)),
-                Delta(f"{fmt_pp(d)} vs. mes anterior", sentiment(d, "up"))],
+                Delta(f"{fmt_pp(d)} vs. mes anterior", sentiment(d, "up"), d)],
                spark(df, "Tasa_Interes_Real_Mensual_Exacta"), "bar", help_)
 
 
@@ -206,7 +237,7 @@ def kpi_salario_real(df: pd.DataFrame) -> KPI:
     return KPI("salario", title, fmt_ars(lo[1], 2), fmt_month(lo[0]),
                [_pct_delta("interanual real", change_pct(df, "Salarios_Real", 12), "up"),
                 _pct_delta("vs. mes anterior", change_pct(df, "Salarios_Real", 1), "up")],
-               spark(df, "Salarios_Real"), help=help_)
+               spark(df, "Salarios_Real"), help=help_, note=real_note(df))
 
 
 def kpi_credito_real(df: pd.DataFrame) -> KPI:
@@ -217,7 +248,7 @@ def kpi_credito_real(df: pd.DataFrame) -> KPI:
     return KPI("credito", title, fmt_ars_millions(lo[1]), fmt_month(lo[0]),
                [_pct_delta("interanual real", change_pct(df, "Credito_Interno_Real", 12), "up"),
                 _pct_delta("vs. mes anterior", change_pct(df, "Credito_Interno_Real", 1), "up")],
-               spark(df, "Credito_Interno_Real"), help=help_)
+               spark(df, "Credito_Interno_Real"), help=help_, note=real_note(df))
 
 
 def kpi_gasto_real(df: pd.DataFrame) -> KPI:
@@ -228,7 +259,7 @@ def kpi_gasto_real(df: pd.DataFrame) -> KPI:
     yoy = change_pct(df, "Gasto_Publico_Primario_Real", 12)
     return KPI("gasto", title, fmt_ars_millions(lo[1]), fmt_month(lo[0]),
                [_pct_delta("interanual real", yoy, "neutral")],
-               spark(df, "Gasto_Publico_Primario_Real"), "bar", help_)
+               spark(df, "Gasto_Publico_Primario_Real"), "bar", help_, note=real_note(df))
 
 
 def kpi_saldo_comercial(df: pd.DataFrame) -> KPI:
@@ -270,7 +301,7 @@ def build_high_freq_kpis(daily_df: pd.DataFrame, fx_quotes: list[dict] | None = 
             "hf-mayorista", "Dólar Mayorista (A3500)", f"$ {fmt_num(lo[1], 2)}", fmt_day(lo[0]),
             [_pct_delta("diario", d1, "neutral"), _pct_delta("últ. 20 ruedas", d20, "neutral")],
             spark(daily_df, "TC_Mayorista", SPARK_DAYS),
-            help="Tipo de cambio mayorista de referencia Com. A 3500 (BCRA API v4.0).",
+            help="Tipo de cambio mayorista de referencia Com. A 3500 (BCRA).",
         ))
     else:
         out.append(_missing_kpi("hf-mayorista", "Dólar Mayorista (A3500)"))
@@ -283,7 +314,7 @@ def build_high_freq_kpis(daily_df: pd.DataFrame, fx_quotes: list[dict] | None = 
         brecha_txt = f"Brecha vs. Mayorista: {fmt_pct(lo_br[1], 1)}" if lo_br else ""
         out.append(KPI(
             "hf-blue", "Dólar Blue (Venta)", f"$ {fmt_num(lo_b[1], 0)}", fmt_day(lo_b[0]),
-            [_pct_delta("diario", d1, "down"), Delta(brecha_txt, sentiment(lo_br[1] if lo_br else None, "down"))],
+            [_pct_delta("diario", d1, "down"), Delta(brecha_txt)],
             spark(daily_df, "Dolar_Blue", SPARK_DAYS),
             help="Cotización libre e histórica diaria (Bluelytics API).",
         ))
@@ -297,12 +328,12 @@ def build_high_freq_kpis(daily_df: pd.DataFrame, fx_quotes: list[dict] | None = 
         may_val = lo[1] if lo else None
         br_ccl = ((float(ccl) / may_val - 1) * 100) if (ccl and may_val) else None
         out.append(KPI(
-            "hf-mep-ccl", "Dólar MEP / CCL (en vivo)",
+            "hf-mep-ccl", "Dólar MEP / CCL",
             f"$ {fmt_num(mep, 1)} / $ {fmt_num(ccl, 1)}",
-            "Cotización de mercado (DolarAPI)",
+            fmt_quote_time((quotes_by_casa.get("bolsa") or quotes_by_casa.get("contadoconliqui") or {}).get("fechaActualizacion")),
             [
                 Delta(f"MEP (Bolsa): $ {fmt_num(mep, 2)}"),
-                Delta(f"Brecha CCL: {fmt_pct(br_ccl, 1)}", sentiment(br_ccl, "down")) if br_ccl is not None else Delta("CCL en vivo"),
+                Delta(f"Brecha CCL vs. Mayorista: {fmt_pct(br_ccl, 1)}") if br_ccl is not None else Delta("CCL en vivo"),
             ],
             spark(daily_df, "Dolar_Blue", SPARK_DAYS),
             help="Cotización actual de Dólar Bolsa (MEP) y Contado con Liquidación (DolarAPI).",
@@ -318,11 +349,11 @@ def build_high_freq_kpis(daily_df: pd.DataFrame, fx_quotes: list[dict] | None = 
         out.append(KPI(
             "hf-riesgo", "Riesgo País (EMBI+)", f"{fmt_num(lo_rp[1], 0)} pb", fmt_day(lo_rp[0]),
             [
-                Delta(f"{fmt_num(d1, 0, signed=True)} pb vs. rueda previa", sentiment(d1, "down")),
-                Delta(f"{fmt_num(d20, 0, signed=True)} pb últ. 20 ruedas", sentiment(d20, "down")),
+                Delta(f"{fmt_num(d1, 0, signed=True)} pb vs. rueda previa", sentiment(d1, "down"), d1),
+                Delta(f"{fmt_num(d20, 0, signed=True)} pb últ. 20 ruedas", sentiment(d20, "down"), d20),
             ],
             spark(daily_df, "Riesgo_Pais", SPARK_DAYS),
-            help="Sobretasa de bonos soberanos argentinos sobre el Tesoro de EE.UU. (Scraping Ámbito / Rava).",
+            help="Sobretasa de bonos soberanos argentinos sobre el Tesoro de EE.UU. (Ámbito y Rava).",
         ))
     else:
         out.append(_missing_kpi("hf-riesgo", "Riesgo País (EMBI+)"))
@@ -335,11 +366,11 @@ def build_high_freq_kpis(daily_df: pd.DataFrame, fx_quotes: list[dict] | None = 
         out.append(KPI(
             "hf-reservas", "Reservas Brutas BCRA", fmt_usd_millions(lo_res[1]), fmt_day(lo_res[0]),
             [
-                Delta(f"US$ {fmt_num(d1, 0, signed=True)} M diario", sentiment(d1, "up")),
-                Delta(f"US$ {fmt_num(d20, 0, signed=True)} M últ. 20 ruedas", sentiment(d20, "up")),
+                Delta(f"US$ {fmt_num(d1, 0, signed=True)} M diario", sentiment(d1, "up"), d1),
+                Delta(f"US$ {fmt_num(d20, 0, signed=True)} M últ. 20 ruedas", sentiment(d20, "up"), d20),
             ],
             spark(daily_df, "Reservas_BCRA", SPARK_DAYS),
-            help="Stock diario de Reservas Internacionales del BCRA (API BCRA v4.0).",
+            help="Stock diario de Reservas Internacionales del BCRA (BCRA).",
         ))
     else:
         out.append(_missing_kpi("hf-reservas", "Reservas Brutas BCRA"))
@@ -354,9 +385,9 @@ def build_high_freq_kpis(daily_df: pd.DataFrame, fx_quotes: list[dict] | None = 
         bad_txt = f"BADLAR: {fmt_pct(lo_bad[1], 2)} TNA" if lo_bad else ""
         out.append(KPI(
             "hf-tasas", "Tasa TAMAR / BADLAR", fmt_pct(main[1], 2), fmt_day(main[0]),
-            [Delta(bad_txt), Delta(f"{fmt_pp(d20)} últ. 20 ruedas")],
+            [Delta(bad_txt), Delta(f"{fmt_pp(d20)} últ. 20 ruedas", trend=d20)],
             spark(daily_df, col_main, SPARK_DAYS),
-            help="Tasas pasivas mayoristas de bancos privados en TNA (API BCRA v4.0).",
+            help="Tasas pasivas mayoristas de bancos privados en TNA (BCRA).",
         ))
     else:
         out.append(_missing_kpi("hf-tasas", "Tasa TAMAR / BADLAR"))
@@ -371,7 +402,7 @@ def build_high_freq_kpis(daily_df: pd.DataFrame, fx_quotes: list[dict] | None = 
             "hf-uva", "Valor UVA / CER", f"$ {fmt_num(lo_uva[1], 2)}", fmt_day(lo_uva[0]),
             [_pct_delta("últ. 30 días", d30, "neutral"), Delta(cer_txt)],
             spark(daily_df, "UVA", SPARK_DAYS),
-            help="Unidad de Valor Adquisitivo y Coeficiente de Estabilización de Referencia (API BCRA v4.0).",
+            help="Unidad de Valor Adquisitivo y Coeficiente de Estabilización de Referencia (BCRA).",
         ))
     else:
         out.append(_missing_kpi("hf-uva", "Valor UVA / CER"))
@@ -409,12 +440,14 @@ def _generic_index_kpi(
     if lo is None:
         return _missing_kpi(key, title, help_)
     yoy = change_pct(df, col_orig, 12)
-    mom = change_pct(df, col_desest or col_orig, 1)
-    lbl_m = "vs. mes ant. (desest.)" if col_desest else "vs. mes anterior"
+    if col_desest:
+        first = _pct_delta("vs. mes ant. (desest.)", change_pct(df, col_desest, 1), "up")
+    else:
+        first = _seasonal_mom_delta(df, col_orig)
     val = f"{fmt_pct(yoy, 1, signed=True)} i.a." if yoy is not None else fmt_num(lo[1], 1)
     return KPI(
         key, title, val, fmt_month(lo[0]),
-        [_pct_delta(lbl_m, mom, "up"), Delta(f"Índice: {fmt_num(lo[1], 1)}")],
+        [first, Delta(f"Índice: {fmt_num(lo[1], 1)}")],
         spark(df, col_desest or col_orig), help=help_,
     )
 
@@ -427,8 +460,8 @@ def build_actividad_kpis(df: pd.DataFrame) -> list[KPI]:
         d_mom = change_pp(df, "UCI_Industria", 1)
         k_uci = KPI(
             "act-uci", "Capacidad instalada (UCI)", fmt_pct(lo_u[1], 1), fmt_month(lo_u[0]),
-            [Delta(f"{fmt_pp(d_yoy, 1)} i.a.", sentiment(d_yoy, "up")),
-             Delta(f"{fmt_pp(d_mom, 1)} vs. mes ant.", sentiment(d_mom, "up"))],
+            [Delta(f"{fmt_pp(d_yoy, 1)} i.a.", sentiment(d_yoy, "up"), d_yoy),
+             Delta(f"{fmt_pp(d_mom, 1)} vs. mes ant.", sentiment(d_mom, "up"), d_mom)],
             spark(df, "UCI_Industria"),
             help="Utilización de la capacidad instalada en la industria (Planilla XLS INDEC + datos.gob.ar).",
         )
@@ -440,7 +473,7 @@ def build_actividad_kpis(df: pd.DataFrame) -> list[KPI]:
         _generic_index_kpi(df, "act-isac", "Construcción (ISAC)", "ISAC_General", "ISAC_Desestacionalizado",
                            "Indicador Sintético de la Actividad de la Construcción (INDEC)."),
         k_uci,
-        _generic_index_kpi(df, "act-super", "Ventas en Supermercados", "Supermercados_Constantes", None,
+        _generic_index_kpi(df, "act-super", "Ventas en Supermercados", "Supermercados_Constantes", "Supermercados_Constantes",
                            "Ventas a precios constantes desestacionalizadas (INDEC)."),
         _generic_index_kpi(df, "act-agro", "EMAE Agropecuario", "EMAE_Agro", None,
                            "Agricultura, ganadería, caza y silvicultura (INDEC)."),
@@ -460,7 +493,7 @@ def build_precios_kpis(df: pd.DataFrame) -> list[KPI]:
         ia = value_at(df, col_ia, lo[0])
         return KPI(
             key, title, fmt_pct(lo[1], 2), fmt_month(lo[0]),
-            [Delta(f"{fmt_pp(d)} vs. mes ant.", sentiment(d, "down")),
+            [Delta(f"{fmt_pp(d)} vs. mes ant.", sentiment(d, "down"), d),
              Delta(f"Interanual: {fmt_pct(ia, 1)}")],
             spark(df, col_m), "bar", help=help_,
         )
@@ -473,10 +506,10 @@ def build_precios_kpis(df: pd.DataFrame) -> list[KPI]:
         ex_ante = value_at(df, "Tasa_Real_ExAnte_Anual_Pct", lo_rem[0])
         k_rem = KPI(
             "pre-rem", "Inflación esperada 12m (REM)", fmt_pct(lo_rem[1], 1), fmt_month(lo_rem[0]),
-            [Delta(f"{fmt_pp(d_rem, 1)} vs. relev. previo", sentiment(d_rem, "down")),
+            [Delta(f"{fmt_pp(d_rem, 1)} vs. relev. previo", sentiment(d_rem, "down"), d_rem),
              Delta(f"Tasa real ex-ante: {fmt_pct(ex_ante, 1, signed=True)}", sign_sentiment(ex_ante))],
             spark(df, "REM_Inflacion_12m"),
-            help="Mediana de inflación esperada para los próximos 12 meses según el REM (BCRA API v4.0).",
+            help="Mediana de inflación esperada para los próximos 12 meses según el REM (BCRA).",
         )
 
     # Tasas activas
@@ -488,9 +521,9 @@ def build_precios_kpis(df: pd.DataFrame) -> list[KPI]:
         pe_txt = f"Personales: {fmt_pct(lo_pe[1], 1)} TNA" if lo_pe else ""
         k_act = KPI(
             "pre-activas", "Tasa Adelantos CC (Empresas)", fmt_pct(lo_ad[1], 1), fmt_month(lo_ad[0]),
-            [Delta(f"{fmt_pp(d_ad, 1)} vs. mes ant.", sentiment(d_ad, "down")), Delta(pe_txt)],
+            [Delta(f"{fmt_pp(d_ad, 1)} vs. mes ant.", sentiment(d_ad, "down"), d_ad), Delta(pe_txt)],
             spark(df, "Tasa_Adelantos"),
-            help="Tasa activa nominal anual por adelantos en cuenta corriente y préstamos personales (BCRA v4.0).",
+            help="Tasa activa nominal anual por adelantos en cuenta corriente y préstamos personales (BCRA).",
         )
 
     return [
@@ -517,10 +550,10 @@ def build_externo_kpis(df: pd.DataFrame) -> list[KPI]:
         d_y = change_pp(df, "Reservas_BCRA", 12)
         k_res = KPI(
             "ext-res", "Reservas Internacionales (BCRA)", fmt_usd_millions(lo_res[1]), fmt_month(lo_res[0]),
-            [Delta(f"US$ {fmt_num(d_m, 0, signed=True)} M vs. mes ant.", sentiment(d_m, "up")),
-             Delta(f"US$ {fmt_num(d_y, 0, signed=True)} M interanual", sentiment(d_y, "up"))],
+            [Delta(f"US$ {fmt_num(d_m, 0, signed=True)} M vs. mes ant.", sentiment(d_m, "up"), d_m),
+             Delta(f"US$ {fmt_num(d_y, 0, signed=True)} M interanual", sentiment(d_y, "up"), d_y)],
             spark(df, "Reservas_BCRA"),
-            help="Stock de Reservas Internacionales Brutas al cierre de cada mes (BCRA v4.0).",
+            help="Stock de Reservas Internacionales Brutas al cierre de cada mes (BCRA).",
         )
 
     # Balanza energética
@@ -558,10 +591,10 @@ def build_externo_kpis(df: pd.DataFrame) -> list[KPI]:
         yoy = change_pct(df, "TC_Mayorista", 12)
         k_tc = KPI(
             "ext-tcmay", "Dólar Mayorista (promedio)", f"$ {fmt_num(lo_tc[1], 1)}", fmt_month(lo_tc[0]),
-            [Delta(f"Variación mensual: {fmt_pct(crawl, 2, signed=True)}"),
-             Delta(f"Interanual: {fmt_pct(yoy, 1, signed=True)}")],
+            [Delta(f"Variación mensual: {fmt_pct(crawl, 2, signed=True)}", trend=crawl),
+             Delta(f"Interanual: {fmt_pct(yoy, 1, signed=True)}", trend=yoy)],
             spark(df, "TC_Mayorista"),
-            help="Tipo de cambio mayorista Com. A 3500 promedio mensual (BCRA v4.0).",
+            help="Tipo de cambio mayorista Com. A 3500 promedio mensual (BCRA).",
         )
 
     # Dólar Blue y Brecha
@@ -573,7 +606,7 @@ def build_externo_kpis(df: pd.DataFrame) -> list[KPI]:
         br_val = lo_br[1] if lo_br else None
         k_bl = KPI(
             "ext-blue", "Dólar Blue (promedio)", f"$ {fmt_num(lo_bl[1], 0)}", fmt_month(lo_bl[0]),
-            [Delta(f"Brecha: {fmt_pct(br_val, 1)}", sentiment(br_val, "down")),
+            [Delta(f"Brecha vs. Mayorista: {fmt_pct(br_val, 1)}"),
              _pct_delta("vs. mes anterior", mom, "down")],
             spark(df, "Brecha_Cambiaria_Pct"),
             help="Promedio mensual del Dólar Blue y brecha porcentual contra el Dólar Mayorista (Bluelytics).",
@@ -587,10 +620,10 @@ def build_externo_kpis(df: pd.DataFrame) -> list[KPI]:
         d_y = change_pp(df, "Riesgo_Pais", 12)
         k_rp = KPI(
             "ext-riesgo", "Riesgo País (cierre mes)", f"{fmt_num(lo_rp[1], 0)} pb", fmt_month(lo_rp[0]),
-            [Delta(f"{fmt_num(d_m, 0, signed=True)} pb vs. mes ant.", sentiment(d_m, "down")),
-             Delta(f"{fmt_num(d_y, 0, signed=True)} pb interanual", sentiment(d_y, "down"))],
+            [Delta(f"{fmt_num(d_m, 0, signed=True)} pb vs. mes ant.", sentiment(d_m, "down"), d_m),
+             Delta(f"{fmt_num(d_y, 0, signed=True)} pb interanual", sentiment(d_y, "down"), d_y)],
             spark(df, "Riesgo_Pais"),
-            help="Riesgo País EMBI+ JP Morgan al cierre de cada mes (Scraping Ámbito / Rava).",
+            help="Riesgo País EMBI+ JP Morgan al cierre de cada mes (Ámbito y Rava).",
         )
 
     # Exportaciones FOB
@@ -600,7 +633,7 @@ def build_externo_kpis(df: pd.DataFrame) -> list[KPI]:
         k_ex = KPI(
             "ext-expo", "Exportaciones FOB", fmt_usd_millions(lo_ex[1]), fmt_month(lo_ex[0]),
             [_pct_delta("interanual", change_pct(df, "Exportaciones_FOB", 12), "up"),
-             _pct_delta("vs. mes ant.", change_pct(df, "Exportaciones_FOB", 1), "up")],
+             _seasonal_mom_delta(df, "Exportaciones_FOB")],
             spark(df, "Exportaciones_FOB"),
             help="Exportaciones totales mensuales FOB en millones de USD (ICA INDEC).",
         )
@@ -614,11 +647,10 @@ def build_fiscal_kpis(df: pd.DataFrame) -> list[KPI]:
         if lo is None:
             return _missing_kpi(key, title, help_)
         yoy = change_pct(df, col, 12)
-        mom = change_pct(df, col, 1)
         return KPI(
             key, title, fmt_ars_millions(lo[1]), fmt_month(lo[0]),
-            [_pct_delta("interanual real", yoy, dir_), _pct_delta("vs. mes ant.", mom, "neutral")],
-            spark(df, col), kind, help=help_,
+            [_pct_delta("interanual real", yoy, dir_), _seasonal_mom_delta(df, col)],
+            spark(df, col), kind, help=help_, note=real_note(df),
         )
 
     # Resultado Primario Real
@@ -631,7 +663,8 @@ def build_fiscal_kpis(df: pd.DataFrame) -> list[KPI]:
             [Delta("Superávit primario" if lo_rp[1] >= 0 else "Déficit primario", sign_sentiment(lo_rp[1])),
              Delta(f"Acum. 12m: {fmt_ars_millions(acum12)}" if acum12 is not None else "")],
             spark(df, "Resultado_Primario_Base_Caja_Real"), "bar",
-            help="Resultado primario de la APN Base Caja expresado a precios del último IPC (Hacienda).",
+            help="Resultado primario de la APN Base Caja expresado en pesos constantes del último IPC (Hacienda).",
+            note=real_note(df),
         )
 
     # Resultado Financiero Real
@@ -645,6 +678,7 @@ def build_fiscal_kpis(df: pd.DataFrame) -> list[KPI]:
              Delta(f"Acum. 12m: {fmt_ars_millions(acum12)}" if acum12 is not None else "")],
             spark(df, "Resultado_Financiero_Base_Caja_Real"), "bar",
             help="Resultado financiero (después de intereses de deuda) a precios del último IPC (Hacienda).",
+            note=real_note(df),
         )
 
     return [
@@ -674,7 +708,8 @@ def build_dinero_kpis(df: pd.DataFrame) -> list[KPI]:
             [_pct_delta("interanual real", change_pct(df, "Base_Monetaria_Real", 12), "neutral"),
              _pct_delta("vs. mes anterior", change_pct(df, "Base_Monetaria_Real", 1), "neutral")],
             spark(df, "Base_Monetaria_Real"),
-            help="Saldo de la Base Monetaria deflactado por IPC (BCRA API v4.0).",
+            help="Saldo de la Base Monetaria deflactado por IPC (BCRA).",
+            note=real_note(df),
         )
 
     # M2 Privado var. i.a.
@@ -684,9 +719,9 @@ def build_dinero_kpis(df: pd.DataFrame) -> list[KPI]:
         d_m2 = change_pp(df, "M2_Privado_Var_IA", 1)
         k_m2 = KPI(
             "din-m2", "M2 Privado (var. i.a.)", fmt_pct(lo_m2[1], 1), fmt_month(lo_m2[0]),
-            [Delta(f"{fmt_pp(d_m2, 1)} vs. mes ant."), Delta("Medios de pago transaccionales")],
+            [Delta(f"{fmt_pp(d_m2, 1)} vs. mes ant.", trend=d_m2), Delta("Medios de pago transaccionales")],
             spark(df, "M2_Privado_Var_IA"),
-            help="Variación interanual del promedio móvil de 30 días del M2 privado (BCRA API v4.0).",
+            help="Variación interanual del promedio móvil de 30 días del M2 privado (BCRA).",
         )
 
     # Ratio Préstamos / Depósitos
@@ -696,7 +731,7 @@ def build_dinero_kpis(df: pd.DataFrame) -> list[KPI]:
         d_pd = change_pp(df, "Ratio_Prestamos_Depositos_Pct", 12)
         k_pd = KPI(
             "din-ratio-pd", "Ratio Préstamos / Depósitos", fmt_pct(lo_pd[1], 1), fmt_month(lo_pd[0]),
-            [Delta(f"{fmt_pp(d_pd, 1)} interanual", sentiment(d_pd, "up")),
+            [Delta(f"{fmt_pp(d_pd, 1)} interanual", sentiment(d_pd, "up"), d_pd),
              Delta("Intermediación bancaria en pesos")],
             spark(df, "Ratio_Prestamos_Depositos_Pct"),
             help="Préstamos en pesos al sector privado sobre Depósitos totales en efectivo (BCRA).",
@@ -736,7 +771,7 @@ def build_dinero_kpis(df: pd.DataFrame) -> list[KPI]:
         pob_txt = f"Pobreza personas: {fmt_pct(lo_pob[1], 1)}" if lo_pob else ""
         k_eph = KPI(
             "din-eph", "Desocupación (EPH)", fmt_pct(lo_des[1], 1), fmt_month(lo_des[0]),
-            [Delta(f"{fmt_pp(d_des, 1)} interanual", sentiment(d_des, "down")), Delta(pob_txt)],
+            [Delta(f"{fmt_pp(d_des, 1)} interanual", sentiment(d_des, "down"), d_des), Delta(pob_txt)],
             spark(df, "Tasa_Desocupacion"),
             help="Tasa de desocupación abierta e incidencia de la pobreza en personas (EPH continua INDEC).",
         )

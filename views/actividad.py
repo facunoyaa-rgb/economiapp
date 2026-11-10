@@ -80,14 +80,20 @@ def fig_semaforo_sectorial(df: pd.DataFrame) -> go.Figure | None:
             orientation="h",
             marker_color=colors,
             marker_opacity=0.85,
-            text=[f"{v:+.1f}%" for v in vals],
+            texttemplate="%{x:+.1f}%",  # respeta separators (coma decimal)
             textposition="outside",
-            hovertemplate="%{y}: %{x:+.2f}% i.a.<extra></extra>",
+            cliponaxis=False,
+            customdata=[r[2] for r in rows],
+            hovertemplate="%{y}: %{x:+.2f}% i.a. (%{customdata})<extra></extra>",
         )
     )
-    fig.update_xaxes(title_text="Variación % interanual (último dato disponible)", ticksuffix="%", zeroline=True,
-                     zerolinecolor=COLORS["border"])
-    fig.update_yaxes(title_text="")
+    # Margen a ambos lados para que las etiquetas "outside" no se corten
+    span = max(abs(v) for v in vals) or 1.0
+    lo_x = min(min(vals), 0) - span * 0.18
+    hi_x = max(max(vals), 0) + span * 0.18
+    fig.update_xaxes(ticksuffix="%", zeroline=True, zerolinecolor=COLORS["border"], range=[lo_x, hi_x],
+                     showgrid=True, gridcolor=COLORS["grid"])
+    fig.update_yaxes(title_text="", ticks="", showgrid=False)
     return fig
 
 
@@ -154,7 +160,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
     return html.Div(
         [
             html.Section(
-                [html.H2("Actividad Económica y Sectores Productivos", className="section-title"),
+                [html.H2("Actividad económica y sectores productivos", className="section-title"),
                  html.Span("EMAE general y sectorial, Industria (IPI y UCI), Construcción (ISAC) y Consumo",
                            className="section-hint")],
                 className="section-head",
@@ -163,7 +169,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_emae, "Evolución del EMAE (Nivel General)",
+                        f_emae, "Evolución del EMAE (nivel general)",
                         "Comparación entre la serie original, desestacionalizada y tendencia-ciclo.",
                         "Fuente: INDEC (API Series de Tiempo datos.gob.ar)."),
                     _chart_or_empty(
@@ -176,11 +182,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_icc, "Industria, Construcción y Consumo Masivo (Base 100)",
+                        f_icc, "Industria, construcción y consumo masivo (base 100)",
                         f"Series desestacionalizadas reexpresadas a base {fmt_month(base_dt) if base_dt else 'común'} = 100.",
                         "Fuente: INDEC (IPI Manufacturero, ISAC Construcción y Encuesta de Supermercados)."),
                     _chart_or_empty(
-                        f_uci, "Utilización de la Capacidad Instalada en la Industria (UCI)",
+                        f_uci, "Utilización de la capacidad instalada en la industria (UCI)",
                         "Porcentaje de utilización del parque industrial nacional y promedio del período.",
                         "Fuente: INDEC (Planilla oficial sh_capacidad.xls + serie histórica SSPM)."),
                 ],

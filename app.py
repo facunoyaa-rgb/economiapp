@@ -69,7 +69,7 @@ def header() -> html.Header:
                     html.Div([html.Span(), html.Span(), html.Span()], className="flag", **{"aria-hidden": "true"}),
                     html.Div(
                         [html.H1("Macro Argentina", className="brand-title"),
-                         html.Span("Tablero de coyuntura · APIs Oficiales (datos.gob.ar, BCRA v4), XLS y Scraping",
+                         html.Span("Coyuntura macroeconómica argentina · 77 series oficiales y de mercado",
                                    className="brand-sub")],
                     ),
                 ],
@@ -114,9 +114,9 @@ app.layout = html.Div(
             className="main",
         ),
         html.Footer(
-            ["Fuentes: INDEC, BCRA (API v4.0 + ITCRM XLSX), Secretaría de Hacienda, Secretaría de Trabajo, ",
-             html.A("apis.datos.gob.ar", href="https://apis.datos.gob.ar/series/api/docs/", target="_blank"),
-             ", Bluelytics, DolarAPI y Ámbito/Rava. Los valores reales se expresan a precios del último IPC publicado."],
+            ["Fuentes: INDEC, BCRA, Secretaría de Hacienda, Secretaría de Trabajo, ",
+             html.A("apis.datos.gob.ar", href="https://apis.datos.gob.ar/series/api/docs/", target="_blank", rel="noopener"),
+             ", Bluelytics, DolarAPI, Ámbito y Rava. Los valores reales se expresan en pesos del último mes con IPC publicado."],
             className="footer",
         ),
     ],
@@ -127,13 +127,34 @@ app.layout = html.Div(
 # --------------------------------------------------------------------------- #
 # Estado de los datos
 # --------------------------------------------------------------------------- #
+def _last_period_text(data: MacroData) -> str:
+    """Último dato del IPC (marca el mes de cierre del panel mensual) y última rueda diaria.
+
+    No se usa la fecha máxima del panel mensual: incluye promedios de series diarias del mes en curso.
+    """
+    df, daily = data.df, data.daily_df
+    parts = []
+    if "IPC_Nivel_General" in df and df["IPC_Nivel_General"].notna().any():
+        parts.append(f"IPC {fmt_month(df.loc[df['IPC_Nivel_General'].notna(), 'Fecha'].max())}")
+    if daily is not None and not daily.empty and "Fecha" in daily:
+        # UVA, UVI, CER e ICL se publican por adelantado: no cuentan como "última rueda"
+        market = [c for c in daily.columns if c not in {"Fecha", "UVA", "UVI", "CER", "ICL"}]
+        mask = daily[market].notna().any(axis=1) if market else daily["Fecha"].notna()
+        if mask.any():
+            parts.append(f"diarias {fmt_day(daily.loc[mask, 'Fecha'].max())}")
+    return " · ".join(parts) or "—"
+
+
 def status_view(data: MacroData) -> html.Details:
     n_ok, n_tot = data.n_ok, data.n_total
-    degraded = any(s["estado"] != "ok" for s in data.series_status.values())
-    level = "bad" if data.source == "cache_desactualizada" or n_ok < n_tot else ("warn" if degraded else "good")
-    last = max(
-        (s.get("ultimo_dato") or "" for s in data.series_status.values() if s.get("frequency", "M") == "M"),
-        default="",
+    not_ok = {c: s for c, s in data.series_status.items() if s["estado"] != "ok"}
+    level = "bad" if data.source == "cache_desactualizada" or n_ok < n_tot else ("warn" if not_ok else "good")
+    by_state: dict[str, int] = {}
+    for s in not_ok.values():
+        by_state[s["estado"]] = by_state.get(s["estado"], 0) + 1
+    state_phrase = {CSV_FALLBACK: "desde el respaldo CSV", FROM_CACHE: "desde la caché anterior", ERROR: "con error"}
+    state_txt = ", ".join(
+        f"{n} {'serie' if n == 1 else 'series'} {state_phrase.get(e, e)}" for e, n in by_state.items()
     )
     rows = [
         html.Tr([
@@ -144,21 +165,24 @@ def status_view(data: MacroData) -> html.Details:
                 if s.get("ultimo_dato") else "—"
             ),
         ], title=s.get("detalle") or s.get("descripcion", ""))
-        for col, s in data.series_status.items()
+        # primero las series con problemas
+        for col, s in sorted(data.series_status.items(), key=lambda kv: kv[1]["estado"] == "ok")
     ]
     return html.Details(
         [
             html.Summary(
-                [html.Span(className=f"dot dot--{level}"),
+                [html.Span(className=f"dot dot--{level}", **{"aria-hidden": "true"}),
                  html.Span(f"{n_ok}/{n_tot} series"),
                  html.Span(f" · descarga {fmt_ago(data.fetched_at)}", className="muted")],
+                title=state_txt or "Todas las series se descargaron correctamente",
             ),
             html.Div(
                 [
                     html.Div([html.Strong("Origen: "),
                               {"api": "Fuentes en vivo (recién descargado)", "cache": "Caché local",
                                "cache_desactualizada": "Caché local (sin conexión remota)"}[data.source]]),
-                    html.Div([html.Strong("Último período mensual: "), fmt_month(last) if last else "—"]),
+                    html.Div([html.Strong("Últimos datos: "), _last_period_text(data)]),
+                    html.Div([html.Strong("Atención: "), state_txt]) if state_txt else None,
                     html.Table([html.Thead(html.Tr([html.Th("Serie"), html.Th("Estado"), html.Th("Último dato")])),
                                 html.Tbody(rows)], className="status-table"),
                 ],
@@ -166,6 +190,7 @@ def status_view(data: MacroData) -> html.Details:
             ),
         ],
         className="status-details",
+        id="status-details",
     )
 
 

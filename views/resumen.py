@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import html
 
-from indicators import build_insights, build_kpis
+from indicators import build_insights, build_kpis, real_base_month
 from pipeline import MacroData
 from ui.components import card, chart_card, empty_state, insight_list, kpi_grid
 from ui.format import fmt_month
@@ -137,7 +137,7 @@ def fig_resultado_fiscal(df: pd.DataFrame) -> go.Figure | None:
             name="Acumulado 12 meses (Primario)", mode="lines",
             line=dict(color=SERIES[0], width=2.2), hovertemplate="$ %{y:,.2f} billones",
         )
-    fig.update_yaxes(title_text="Billones de ARS constantes")
+    fig.update_yaxes(title_text=f"Billones de $ de {real_base_month(df)}")
     fig.update_xaxes(hoverformat="%b %Y")
     return fig
 
@@ -202,11 +202,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_res, "Reservas Internacionales y Riesgo País",
+                        f_res, "Reservas internacionales y riesgo país",
                         "Stock de reservas brutas del BCRA (eje izq.) y sobretasa soberana EMBI+ (eje der.).",
-                        "Fuente: BCRA (API v4.0) y Scraping Ámbito / Rava Bursátil."),
+                        "Fuente: BCRA, Ámbito Financiero y Rava Bursátil."),
                     _chart_or_empty(
-                        f_fis, "Resultado Fiscal Primario (real)",
+                        f_fis, "Resultado fiscal primario (real)",
                         "Resultado mensual y acumulado de 12 meses a precios del último IPC.",
                         "Fuente: Secretaría de Hacienda (Esquema Ahorro-Inversión-Financiamiento Base Caja)."),
                 ],

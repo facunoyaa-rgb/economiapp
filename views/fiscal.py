@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import html
 
-from indicators import build_fiscal_kpis
+from indicators import build_fiscal_kpis, real_base_month
 from pipeline import MacroData
 from ui.components import card, chart_card, empty_state, kpi_grid
 from ui.theme import COLORS, SERIES
@@ -44,7 +44,7 @@ def fig_ingresos_vs_gasto_real(df: pd.DataFrame) -> go.Figure | None:
                 x=d["Fecha"], y=d[col], name=label, mode="lines",
                 line=dict(color=color, width=w, dash=dash), hovertemplate="$ %{y:,.0f} M",
             )
-    fig.update_yaxes(title_text="Millones de ARS constantes")
+    fig.update_yaxes(title_text=f"Millones de $ de {real_base_month(df)}")
     fig.update_xaxes(hoverformat="%b %Y")
     return fig
 
@@ -68,7 +68,7 @@ def fig_resultado_fiscal_mensual_real(df: pd.DataFrame) -> go.Figure | None:
             line=dict(color=SERIES[1], width=2.0), hovertemplate="$ %{y:,.0f} M",
         )
     fig.add_hline(y=0, line=dict(color=COLORS["border"], width=1))
-    fig.update_yaxes(title_text="Millones de ARS constantes")
+    fig.update_yaxes(title_text=f"Millones de $ de {real_base_month(df)}")
     fig.update_xaxes(hoverformat="%b %Y")
     return fig
 
@@ -94,7 +94,7 @@ def fig_resultado_fiscal_12m_real(df: pd.DataFrame) -> go.Figure | None:
             hovertemplate="$ %{y:,.0f} M",
         )
     fig.add_hline(y=0, line=dict(color=COLORS["border"], width=1))
-    fig.update_yaxes(title_text="Millones de ARS constantes (12m)")
+    fig.update_yaxes(title_text=f"Millones de $ de {real_base_month(df)} (12 m)")
     fig.update_xaxes(hoverformat="%b %Y")
     return fig
 
@@ -121,7 +121,7 @@ def fig_recaudacion_tributaria_real(df: pd.DataFrame) -> go.Figure | None:
             mode="lines", line=dict(color="#ffffff", width=2.1), hovertemplate="$ %{y:,.0f} M",
         )
     fig.update_layout(barmode="stack")
-    fig.update_yaxes(title_text="Millones de ARS constantes")
+    fig.update_yaxes(title_text=f"Millones de $ de {real_base_month(df)}")
     fig.update_xaxes(hoverformat="%b %Y")
     return fig
 
@@ -145,7 +145,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
     return html.Div(
         [
             html.Section(
-                [html.H2("Sector Público Nacional No Financiero (SPNF) y Recaudación", className="section-title"),
+                [html.H2("Sector público nacional no financiero (SPNF) y recaudación", className="section-title"),
                  html.Span("Ejecución base caja e ingresos tributarios deflactados a precios constantes del último IPC",
                            className="section-hint")],
                 className="section-head",
@@ -154,11 +154,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_ig, "Ingresos Totales vs. Gasto Primario y Total a precios constantes",
+                        f_ig, "Ingresos totales, gasto primario y gasto total a precios constantes",
                         "Dinámica real de recursos y erogaciones del Sector Público Nacional No Financiero.",
                         "Fuente: Secretaría de Hacienda (IMIG) e INDEC (IPC)."),
                     _chart_or_empty(
-                        f_rm, "Resultado Primario y Financiero Mensual Real (Base Caja)",
+                        f_rm, "Resultado primario y financiero mensual real (base caja)",
                         "Superávit (verde) o déficit (rojo) primario mensual y resultado financiero luego de intereses.",
                         "Fuente: Secretaría de Hacienda (IMIG) e INDEC (IPC)."),
                 ],
@@ -167,11 +167,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             html.Div(
                 [
                     _chart_or_empty(
-                        f_r12, "Resultado Fiscal Acumulado de 12 Meses a precios constantes",
+                        f_r12, "Resultado fiscal acumulado de 12 meses a precios constantes",
                         "Suma móvil de 12 meses del resultado primario y financiero real para suavizar estacionalidad.",
                         "Fuente: Elaboración propia sobre Secretaría de Hacienda e INDEC."),
                     _chart_or_empty(
-                        f_rec, "Recaudación Tributaria Nacional Real por origen (DGI, Aduana y Seg. Social)",
+                        f_rec, "Recaudación tributaria nacional real por origen (DGI, Aduana y Seguridad Social)",
                         "Componentes de recursos tributarios deflactados por IPC y recaudación total.",
                         "Fuente: ARCA/AFIP, DNIAF - Ministerio de Economía e INDEC."),
                 ],

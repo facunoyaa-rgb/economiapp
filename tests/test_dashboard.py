@@ -183,3 +183,51 @@ def test_catalog_and_all_views_render():
     for mod in [resumen, alta_frecuencia, actividad, precios, externo, fiscal, dinero, datos]:
         view_div = mod.layout(data, 5)
         assert view_div is not None
+
+
+# --------------------------------------------------------------------------- #
+# Fase 1 de la auditoría UX/UI
+# --------------------------------------------------------------------------- #
+def _monthly(col: str, values: list[float], start: str = "2024-01-01") -> pd.DataFrame:
+    return pd.DataFrame({"Fecha": pd.date_range(start, periods=len(values), freq="MS"), col: values})
+
+
+def test_arrow_follows_sign_not_sentiment():
+    from ui.components import trend_arrow
+
+    assert trend_arrow(-66.0) == "▼"
+    assert trend_arrow(12.5) == "▲"
+    assert trend_arrow(0.0) == ""
+    assert trend_arrow(None) == ""
+    assert trend_arrow(float("nan")) == ""
+
+
+def test_riesgo_pais_drop_is_green_with_down_arrow():
+    daily = pd.DataFrame({"Fecha": pd.date_range("2026-10-01", periods=25, freq="B"),
+                          "Riesgo_Pais": [900.0] * 24 + [834.0]})
+    k = next(k for k in build_high_freq_kpis(daily, []) if k.key == "hf-riesgo")
+    d = k.deltas[0]
+    assert d.sentiment == "good" and d.trend < 0  # baja = buena, flecha hacia abajo
+
+
+def test_original_series_do_not_compare_against_previous_month():
+    vals = [100 + (i % 12) * 5 for i in range(30)]  # estacionalidad marcada
+    df = _monthly("EMAE_Agro", vals)
+    k = next(k for k in build_actividad_kpis(df) if k.key == "act-agro")
+    first = k.deltas[0]
+    assert "mes ant" not in first.text and "i.a." in first.text
+    assert first.sentiment == "neutral"
+
+
+def test_real_values_name_their_base_month():
+    from indicators import real_base_month
+
+    df = _monthly("IPC_Nivel_General", [100.0, 102.0, 104.0, np.nan], start="2026-06-01")
+    assert real_base_month(df) == "ago 2026"
+
+
+def test_quote_time_in_argentina():
+    from ui.format import fmt_quote_time
+
+    assert fmt_quote_time("2026-11-05T18:55:00.000Z") == "05 nov 15:55"
+    assert fmt_quote_time(None) == DASH

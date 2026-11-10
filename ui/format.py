@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -106,3 +106,20 @@ def fmt_ago(dt: datetime | None, now: datetime | None = None) -> str:
         return f"hace {int(secs // 3600)} h"
     d = int(secs // 86400)
     return f"hace {d} día{'s' if d != 1 else ''}"
+
+
+AR_TZ = timezone(timedelta(hours=-3))  # Argentina no aplica horario de verano
+
+
+def fmt_quote_time(iso: str | None) -> str:
+    """'2026-11-05T18:55:00.000Z' -> '05 nov 15:55' (hora de Argentina)."""
+    if not iso:
+        return DASH
+    try:
+        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except ValueError:
+        return DASH
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    dt = dt.astimezone(AR_TZ)
+    return f"{dt.day:02d} {MESES[dt.month - 1]} {dt:%H:%M}"

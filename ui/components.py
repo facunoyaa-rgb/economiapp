@@ -10,7 +10,13 @@ from indicators import KPI
 from ui.theme import COLORS, GRAPH_CONFIG
 
 SENTIMENT_COLOR = {"good": COLORS["good"], "bad": COLORS["bad"], "neutral": COLORS["muted"]}
-ARROW = {"good": "▲", "bad": "▼", "neutral": "•"}
+
+
+def trend_arrow(trend: float | None, tol: float = 1e-9) -> str:
+    """Flecha según el signo de la variación (dirección), independiente de si es buena o mala."""
+    if trend is None or (isinstance(trend, float) and math.isnan(trend)) or abs(trend) < tol:
+        return ""
+    return "▲" if trend > 0 else "▼"
 
 
 # --------------------------------------------------------------------------- #
@@ -62,11 +68,12 @@ def kpi_card(k: KPI) -> html.Div:
     spark_src = sparkline_svg(k.spark, k.spark_kind) if k.available else ""
     deltas = [
         html.Div(
-            [html.Span(ARROW[d.sentiment], className="kpi-arrow") if d.sentiment != "neutral" else None,
+            [html.Span(trend_arrow(d.trend), className="kpi-arrow", **{"aria-hidden": "true"})
+             if trend_arrow(d.trend) else None,
              html.Span(d.text)],
             className=f"kpi-delta kpi-delta--{d.sentiment}",
         )
-        for d in k.deltas
+        for d in k.deltas if d.text
     ]
     card_id = f"kpi-{k.key}"
     return html.Div(
@@ -82,7 +89,7 @@ def kpi_card(k: KPI) -> html.Div:
                 className="kpi-body",
             ),
             html.Div(deltas, className="kpi-deltas"),
-            html.Div(k.date and f"Último dato: {k.date}", className="kpi-date"),
+            html.Div(" · ".join(p for p in [k.date and f"Último dato: {k.date}", k.note] if p), className="kpi-date"),
         ],
         className="kpi-card" + ("" if k.available else " kpi-card--missing"),
         id=card_id,

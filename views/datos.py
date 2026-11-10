@@ -77,41 +77,48 @@ def layout(data: MacroData, years: int | None = None) -> html.Div:
             )
         )
 
+    C = html.Code
     methodology_notes = html.Ul(
         [
             html.Li([
-                html.Strong("Separación de Frecuencias (Mensual vs. Diaria): "),
-                "El tablero principal mantiene una grilla 100% mensual (`MS`, inicio de mes) para asegurar "
-                "consistencia en el deflactado por IPC y las variaciones interanuales (a/a). Las series nativas "
-                "diarias se consolidan mediante promedio mensual (tasas, tipos de cambio, ITCRM) o último valor "
-                "hábil (stocks y reservas), y además se exponen sin agregación en la pestaña ",
+                html.Strong("Separación de frecuencias (mensual y diaria). "),
+                "El tablero principal usa una grilla mensual (", C("MS"), ", inicio de mes) para que el "
+                "deflactado por IPC y las variaciones interanuales sean consistentes. Las series diarias se "
+                "consolidan por promedio mensual (tasas, tipos de cambio, ITCRM) o por último valor hábil "
+                "(stocks y reservas), y además se muestran sin agregar en la pestaña ",
                 html.Strong("Alta frecuencia (diario)"), ".",
-            ], className="insight"),
+            ], className="method-note"),
             html.Li([
-                html.Strong("Deflactación a Precios Constantes: "),
-                "Todas las magnitudes nominales en pesos (Base Monetaria, Crédito, Plazos Fijos, Ingresos y Gastos "
-                "del SPNF, Recaudación, Salarios y Tipos de Cambio Reales bilaterales internos) se expresan en "
-                "pesos constantes del último mes con IPC publicado: ",
-                html.Code("Valor_Real[t] = Valor_Nominal[t] * (IPC[T] / IPC[t])"), ".",
-            ], className="insight"),
+                html.Strong("Deflactación a precios constantes. "),
+                "Las magnitudes nominales en pesos (base monetaria, crédito, plazos fijos, ingresos y gastos "
+                "del SPN, recaudación, salarios y los tipos de cambio mayorista y blue) se expresan en pesos constantes del último mes con IPC "
+                "publicado: ", C("Valor_Real[t] = Valor_Nominal[t] × IPC[T] / IPC[t]"), ".",
+            ], className="method-note"),
             html.Li([
-                html.Strong("Tasas de Interés Efectivas y Reales (Ecuación de Fisher): "),
-                "A partir de las TNA publicadas por el BCRA se calcula la Tasa Efectiva Mensual ",
-                html.Code("TEM = TNA / 12"), " y la Tasa Efectiva Anual ",
-                html.Code("TEA = (1 + TNA/12)^12 - 1"), ". La tasa real ex-post descuenta la inflación mensual "
-                "efectiva mediante Fisher: ", html.Code("((1 + TEM) / (1 + Inflación_m/m)) - 1"),
-                ", mientras que la tasa real ex-ante utiliza la expectativa de inflación a 12 meses del REM.",
-            ], className="insight"),
+                html.Strong("Tasas efectivas y reales (ecuación de Fisher). "),
+                "A partir de la TNA publicada por el BCRA se calcula la tasa efectiva mensual ",
+                C("TEM = TNA / 12"), " y la efectiva anual ", C("TEA = (1 + TNA/12)^12 − 1"),
+                ". La tasa real ex-post descuenta la inflación mensual observada: ",
+                C("(1 + TEM) / (1 + π_m) − 1"),
+                ". La tasa real ex-ante usa, en cambio, la inflación esperada a 12 meses del REM.",
+            ], className="method-note"),
             html.Li([
-                html.Strong("Arquitectura Multi-Proveedor y Tolerancia a Fallos: "),
-                "La ingesta combina en paralelo APIs gubernamentales REST (`datos.gob.ar` con enriquecimiento de "
-                "distribuciones CSV completas del catálogo SSPM y `api.bcra.gob.ar/estadisticas/v4.0`), APIs de "
-                "mercado (`Bluelytics` y `DolarAPI`), parseo directo en memoria de planillas Excel oficiales "
-                "(`ITCRMSerie.xlsx` del BCRA y `sh_capacidad_08_26.xls` del INDEC) y web scraping de `Ámbito / Rava` "
-                "con caché persistente en Parquet (`series_raw.parquet` y `series_daily.parquet`).",
-            ], className="insight"),
+                html.Strong("Variaciones y estacionalidad. "),
+                "Las variaciones contra el mes anterior se muestran solo para series desestacionalizadas. "
+                "En las series originales (aperturas del EMAE, exportaciones, cuentas fiscales base caja) "
+                "se informa la variación interanual, que no está afectada por la estacionalidad.",
+            ], className="method-note"),
+            html.Li([
+                html.Strong("Fuentes y tolerancia a fallos. "),
+                "Los datos se combinan en paralelo desde APIs oficiales (", C("datos.gob.ar"),
+                ", con las distribuciones CSV del catálogo SSPM, y ", C("api.bcra.gob.ar/estadisticas/v4.0"),
+                "), APIs de mercado (Bluelytics y DolarAPI), planillas oficiales leídas en memoria (",
+                C("ITCRMSerie.xlsx"), " del BCRA y la planilla de capacidad instalada del INDEC) y la lectura "
+                "web de Ámbito y Rava para el riesgo país. Todo queda en una caché Parquet: si una fuente "
+                "falla, se usa el último dato guardado.",
+            ], className="method-note"),
         ],
-        className="insights",
+        className="method-notes",
     )
 
     export_bar = html.Div(
@@ -174,15 +181,15 @@ def layout(data: MacroData, years: int | None = None) -> html.Div:
     return html.Div(
         [
             html.Section(
-                [html.H2("Catálogo de Datos, Fuentes y Metodología", className="section-title"),
+                [html.H2("Catálogo de datos, fuentes y metodología", className="section-title"),
                  html.Span(f"Auditoría en vivo de las {data.n_total} series configuradas y notas metodológicas",
                            className="section-hint")],
                 className="section-head",
             ),
             _provider_summary_cards(data),
-            card(export_bar, "Descarga de Datos (CSV)"),
-            card(methodology_notes, "Notas Metodológicas y Transformaciones"),
-            card(table, f"Catálogo Completo de Series ({data.n_ok}/{data.n_total} operativas)",
+            card(export_bar, "Descarga de datos (CSV)"),
+            card(methodology_notes, "Notas metodológicas y transformaciones"),
+            card(table, f"Catálogo completo de series ({data.n_ok}/{data.n_total} operativas)",
                  "Detalle de proveedor, identificador técnico, frecuencia nativa y cobertura temporal."),
         ],
         className="view",

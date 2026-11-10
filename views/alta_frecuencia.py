@@ -8,7 +8,7 @@ from dash import html
 from indicators import build_high_freq_kpis
 from pipeline import MacroData
 from ui.components import card, chart_card, empty_state, kpi_grid
-from ui.format import fmt_day, fmt_num, fmt_pct
+from ui.format import fmt_day, fmt_num, fmt_pct, fmt_quote_time
 from ui.theme import COLORS, SERIES
 
 
@@ -60,7 +60,7 @@ def fx_board(fx_quotes: list[dict], may_ref: float | None = None) -> html.Div:
             html.Div(
                 [
                     html.Div(nombre, className="kpi-title"),
-                    html.Div(f"$ {fmt_num(venta, 2)}", className="kpi-value", style={"fontSize": "1.2rem"}),
+                    html.Div(f"$ {fmt_num(venta, 2)}", className="kpi-value fx-value"),
                     html.Div(
                         [
                             html.Span(f"Compra: $ {fmt_num(compra, 2)}", className="muted"),
@@ -69,10 +69,11 @@ def fx_board(fx_quotes: list[dict], may_ref: float | None = None) -> html.Div:
                                 className="kpi-delta--neutral",
                             ),
                         ],
-                        style={"fontSize": "0.75rem"},
+                        className="fx-detail",
                     ),
+                    html.Div(f"Cotización: {fmt_quote_time(q.get('fechaActualizacion'))}", className="kpi-date"),
                 ],
-                className="kpi-card",
+                className="kpi-card fx-card",
             )
         )
     return html.Div(items, className="kpi-grid")
@@ -208,15 +209,15 @@ def layout(data: MacroData, years: int | None) -> html.Div:
     return html.Div(
         [
             html.Section(
-                [html.H2("Monitor de Alta Frecuencia (Ruedas Diarias)", className="section-title"),
-                 html.Span("Series diarias del BCRA (API v4.0 + XLSX), Bluelytics, DolarAPI y Scraping Ámbito/Rava",
+                [html.H2("Monitor de alta frecuencia (ruedas diarias)", className="section-title"),
+                 html.Span("Series diarias del BCRA, Bluelytics, DolarAPI, Ámbito y Rava",
                            className="section-hint")],
                 className="section-head",
             ),
             kpi_grid(build_high_freq_kpis(daily_df, data.fx_quotes)),
             html.Section(
-                [html.H2("Pizarrón cambiario en vivo", className="section-title"),
-                 html.Span("Cotizaciones actuales y brecha respecto al Dólar Mayorista (DolarAPI)",
+                [html.H2("Pizarrón cambiario", className="section-title"),
+                 html.Span("Última cotización de cada mercado y brecha contra el Dólar Mayorista (DolarAPI). Hora de Argentina.",
                            className="section-hint")],
                 className="section-head",
             ) if data.fx_quotes else None,
@@ -226,11 +227,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                     _chart_or_empty(
                         f_fx, "Tipos de cambio diarios y brecha cambiaria",
                         "Evolución diaria del Dólar Mayorista (A3500), Minorista y Blue, junto con la brecha (%).",
-                        "Fuente: BCRA (API v4.0) y Bluelytics API."),
+                        "Fuente: BCRA y Bluelytics."),
                     _chart_or_empty(
-                        f_rr, "Reservas Internacionales Brutas vs. Riesgo País (diario)",
+                        f_rr, "Reservas internacionales brutas y riesgo país (diario)",
                         "Stock diario de reservas del BCRA (USD M) y sobretasa EMBI+ JP Morgan (puntos básicos).",
-                        "Fuente: BCRA (API v4.0) y Scraping Ámbito Financiero / Rava Bursátil."),
+                        "Fuente: BCRA, Ámbito Financiero y Rava Bursátil."),
                 ],
                 className="grid-2",
             ),
@@ -239,11 +240,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                     _chart_or_empty(
                         f_ts, "Curva de tasas de interés diarias (TNA %)",
                         "Tasas pasivas mayoristas (BADLAR y TAMAR) y tasas activas (Adelantos CC y Personales).",
-                        "Fuente: BCRA (API Estadísticas v4.0)."),
+                        "Fuente: BCRA."),
                     _chart_or_empty(
-                        f_ix, "Indexadores diarios vs. Dólar Mayorista (Base 100)",
+                        f_ix, "Indexadores diarios y dólar mayorista (base 100)",
                         "Carrera diaria entre UVA (IPC), UVI (Construcción), CER y el tipo de cambio oficial.",
-                        "Fuente: BCRA (API Estadísticas v4.0)."),
+                        "Fuente: BCRA."),
                 ],
                 className="grid-2",
             ),
