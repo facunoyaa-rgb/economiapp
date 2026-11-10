@@ -824,6 +824,16 @@ class MacroData:
     def n_total(self) -> int:
         return len(self.series_status)
 
+    def is_daily(self, col: str) -> bool:
+        return (self.series_status.get(col) or {}).get("frecuencia") == "diaria"
+
+    def last_date(self, col: str) -> pd.Timestamp | None:
+        """Fecha del último dato: el día exacto para las series diarias, el mes para las demás."""
+        for df in ((self.daily_df, self.df) if self.is_daily(col) else (self.df,)):
+            if df is not None and col in df and df[col].notna().any():
+                return df.loc[df[col].notna(), "Fecha"].max()
+        return None
+
 
 def _annotate_status(raw: pd.DataFrame, status: dict[str, dict], catalog: dict) -> dict[str, dict]:
     for col in catalog:

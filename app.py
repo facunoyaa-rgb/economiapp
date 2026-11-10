@@ -15,7 +15,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import ui.theme  # noqa: F401  (registra el template de Plotly)
 from pipeline import CSV_FALLBACK, ERROR, FROM_CACHE, MacroData, get_macro_data
 from ui.format import fmt_ago, fmt_day, fmt_month
-from views import actividad, alta_frecuencia, datos, dinero, externo, fiscal, precios, resumen
+from ui.theme import set_theme
+from views import actividad, alta_frecuencia, datos, dinero, explorador, externo, fiscal, precios, resumen
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -57,6 +58,10 @@ app.index_string = f"""<!DOCTYPE html>
         <meta name="description" content="{APP_DESCRIPTION}">
         <meta name="theme-color" content="#0e1117">
         <link rel="preload" href="{_plotly_bundle_url()}" as="script">
+        <script>
+            // Tema guardado (dcc.Store "theme" en localStorage), aplicado antes de pintar para evitar el parpadeo
+            try {{ if (JSON.parse(localStorage.getItem("theme")) === "light") document.documentElement.dataset.theme = "light"; }} catch (e) {{}}
+        </script>
         <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
         <meta property="og:type" content="website">
         <meta property="og:locale" content="es_AR">
@@ -94,6 +99,7 @@ DEFAULT_RANGE = 5
 # (clave interna de la vista, fragmento de la URL, etiqueta)
 TABS = [
     ("resumen", "resumen", "Resumen"),
+    ("explorador", "explorador", "Explorador"),
     ("alta_frecuencia", "alta-frecuencia", "Alta frecuencia (diario)"),
     ("actividad", "actividad", "Actividad"),
     ("precios", "precios", "Precios y tasas"),
@@ -147,6 +153,8 @@ def header() -> html.Header:
                         **{"aria-labelledby": "range-label"},
                     ),
                     html.Div(id="data-status", className="status"),
+                    html.Button("☀", id="theme-toggle", n_clicks=0, className="btn btn--icon", type="button",
+                                title="Cambiar a tema claro", **{"aria-label": "Cambiar a tema claro"}),
                     html.Button("↻ Actualizar", id="refresh", n_clicks=0, className="btn",
                                 title="Volver a descargar los datos de las fuentes (como máximo cada 15 min)"),
                 ],
@@ -190,6 +198,7 @@ def footer() -> html.Footer:
 app.layout = html.Div(
     [
         dcc.Location(id="url", refresh=False),
+        dcc.Store(id="theme", storage_type="local", data="dark"),
         html.A("Saltar al contenido", href="#contenido", className="skip-link"),
         header(),
         html.Div(id="banner", role="status"),
@@ -227,30 +236,61 @@ clientside_callback(
 )
 
 # Período <-> ?p= en la URL. Es un solo callback para que la dependencia circular sea válida.
+# Solo toca `p`: el resto de los parámetros (el estado del Explorador) se conserva.
 clientside_callback(
     """
     function(search, value) {
         var NU = window.dash_clientside.no_update;
         var allowed = %s;
         var trig = (dash_clientside.callback_context.triggered || []).map(function (t) { return t.prop_id; });
-        var m = /[?&]p=(\\d+)/.exec(search || "");
-        var fromUrl = m ? parseInt(m[1], 10) : null;
+        var params = new URLSearchParams(search || "");
+        var raw = params.get("p");
+        var fromUrl = raw !== null && /^\\d+$/.test(raw) ? parseInt(raw, 10) : null;
         if (fromUrl !== null && allowed.indexOf(fromUrl) === -1) { fromUrl = null; }
+        function withP(v) { params.set("p", v); return "?" + params.toString().replace(/%%2C/g, ","); }
         var rangeChanged = trig.indexOf("range.value") !== -1;
         var urlChanged = trig.indexOf("url.search") !== -1;
         if (rangeChanged && !urlChanged) {
-            return [NU, fromUrl === value ? NU : "?p=" + value];
+            return [NU, fromUrl === value ? NU : withP(value)];
         }
         if (fromUrl !== null) {
             return [fromUrl === value ? NU : fromUrl, NU];
         }
-        return [NU, "?p=" + value];
+        return [NU, withP(value)];
     }
     """ % sorted(RANGE_VALUES),
     Output("range", "value"),
     Output("url", "search"),
     Input("url", "search"),
     Input("range", "value"),
+)
+
+# Tema claro/oscuro: el botón alterna el valor guardado y el <html> recibe data-theme
+clientside_callback(
+    """
+    function(n, theme) {
+        return theme === "light" ? "dark" : "light";
+    }
+    """,
+    Output("theme", "data"),
+    Input("theme-toggle", "n_clicks"),
+    State("theme", "data"),
+    prevent_initial_call=True,
+)
+clientside_callback(
+    """
+    function(theme) {
+        var light = theme === "light";
+        if (light) { document.documentElement.dataset.theme = "light"; }
+        else { delete document.documentElement.dataset.theme; }
+        var label = light ? "Cambiar a tema oscuro" : "Cambiar a tema claro";
+        var btn = document.getElementById("theme-toggle");
+        if (btn) { btn.title = label; btn.setAttribute("aria-label", label); }
+        return light ? "☾" : "☀";
+    }
+    """,
+    Output("theme-toggle", "children"),
+    Input("theme", "data"),
 )
 
 
@@ -275,6 +315,13 @@ def _last_period_text(data: MacroData) -> str:
     return " · ".join(parts) or "—"
 
 
+def _last_date_text(data: MacroData, col: str) -> str:
+    last = data.last_date(col)
+    if last is None:
+        return "—"
+    return fmt_day(last) if data.is_daily(col) else fmt_month(last)
+
+
 def status_view(data: MacroData) -> html.Details:
     n_ok, n_tot = data.n_ok, data.n_total
     not_ok = {c: s for c, s in data.series_status.items() if s["estado"] != "ok"}
@@ -290,10 +337,7 @@ def status_view(data: MacroData) -> html.Details:
         html.Tr([
             html.Td(col.replace("_", " ")),
             html.Td(STATUS_LABEL.get(s["estado"], s["estado"]), className=f"st st--{s['estado']}"),
-            html.Td(
-                (fmt_day(s.get("ultimo_dato")) if s.get("frequency") == "D" else fmt_month(s.get("ultimo_dato")))
-                if s.get("ultimo_dato") else "—"
-            ),
+            html.Td(_last_date_text(data, col)),
         ], title=s.get("detalle") or s.get("descripcion", ""))
         # primero las series con problemas
         for col, s in sorted(data.series_status.items(), key=lambda kv: kv[1]["estado"] == "ok")
@@ -364,13 +408,16 @@ VIEW_MAP = {
     Input("url", "hash"),
     Input("range", "value"),
     Input("refresh", "n_clicks"),
+    Input("theme", "data"),
+    State("url", "search"),
     running=[
         (Output("refresh", "disabled"), True, False),
         (Output("refresh", "children"), "Actualizando…", "↻ Actualizar"),
     ],
 )
-def render(hash_: str | None, years: int, _clicks: int):
+def render(hash_: str | None, years: int, _clicks: int, theme: str | None, search: str | None):
     tab = view_from_hash(hash_)
+    set_theme(theme)
     try:
         force = ctx.triggered_id == "refresh"
     except Exception:  # noqa: BLE001
@@ -382,8 +429,10 @@ def render(hash_: str | None, years: int, _clicks: int):
         msg = html.Div(f"No se pudieron obtener datos y no hay caché local: {e}", className="banner banner--bad")
         return html.Div(), no_update, msg
 
-    view_fn = VIEW_MAP.get(tab, resumen.layout)
-    content = view_fn(data, years or None)
+    if tab == "explorador":
+        content = explorador.layout(data, years or None, search)
+    else:
+        content = VIEW_MAP.get(tab, resumen.layout)(data, years or None)
     return content, status_view(data), banner_view(data)
 
 

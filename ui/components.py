@@ -8,7 +8,7 @@ import numpy as np
 from dash import dcc, html
 
 from indicators import KPI
-from ui.theme import COLORS, GRAPH_CONFIG
+from ui.theme import COLORS, GRAPH_CONFIG, color, themed_figure
 
 SENTIMENT_COLOR = {"good": COLORS["good"], "bad": COLORS["bad"], "neutral": COLORS["muted"]}
 
@@ -44,20 +44,21 @@ def sparkline_svg(values: list[float], kind: str = "line", width: int = 120, hei
         y0 = y(0)
         for i, v in enumerate(vals):
             yv = y(v)
-            color = COLORS["good"] if v >= 0 else COLORS["bad"]
+            fill = color(COLORS["good"] if v >= 0 else COLORS["bad"])
             opacity = 1 if i == n - 1 else 0.55  # resalta el último dato
             parts.append(
                 f'<rect x="{i * bw + bw * 0.15:.1f}" y="{min(yv, y0):.1f}" width="{bw * 0.7:.1f}" '
-                f'height="{max(abs(y0 - yv), 0.8):.1f}" fill="{color}" fill-opacity="{opacity}"/>'
+                f'height="{max(abs(y0 - yv), 0.8):.1f}" fill="{fill}" fill-opacity="{opacity}"/>'
             )
     else:
+        accent = color(COLORS["accent"])
         step = width / (len(vals) - 1)
         pts = " ".join(f"{i * step:.1f},{y(v):.1f}" for i, v in enumerate(vals))
         area = f"0,{height} {pts} {width},{height}"
-        parts.append(f'<polygon points="{area}" fill="{COLORS["accent"]}" fill-opacity="0.12"/>')
-        parts.append(f'<polyline points="{pts}" fill="none" stroke="{COLORS["accent"]}" stroke-width="1.6" '
+        parts.append(f'<polygon points="{area}" fill="{accent}" fill-opacity="0.12"/>')
+        parts.append(f'<polyline points="{pts}" fill="none" stroke="{accent}" stroke-width="1.6" '
                      f'stroke-linejoin="round" stroke-linecap="round"/>')
-        parts.append(f'<circle cx="{width - 0.5:.1f}" cy="{y(vals[-1]):.1f}" r="2.4" fill="{COLORS["accent"]}"/>')
+        parts.append(f'<circle cx="{width - 0.5:.1f}" cy="{y(vals[-1]):.1f}" r="2.4" fill="{accent}"/>')
     parts.append("</svg>")
     return "data:image/svg+xml;utf8," + quote("".join(parts))
 
@@ -162,11 +163,41 @@ def compact_figure(fig) -> None:
                 setattr(tr, axis, arr.astype(np.float32))
 
 
+def _trace_color(tr) -> str | None:
+    line = getattr(tr, "line", None)
+    marker = getattr(tr, "marker", None)
+    c = (line.color if line is not None and tr.type == "scatter" and "lines" in (tr.mode or "lines") else None) \
+        or (marker.color if marker is not None else None)
+    return c if isinstance(c, str) else None
+
+
+def color_dual_axes(fig) -> None:
+    """En gráficos con eje derecho, pinta cada eje (números y título) con el color de su serie.
+
+    Si un eje tiene varias series de distinto color, queda en gris: el color solo ayuda cuando es unívoco.
+    """
+    y2 = fig.layout["yaxis2"] if "yaxis2" in fig.layout else None
+    if y2 is None or not y2.overlaying:
+        return
+    for axis_ref, axis_name in (("y2", "yaxis2"), ("y", "yaxis")):
+        traces = [t for t in fig.data if (getattr(t, "yaxis", None) or "y") == axis_ref]
+        colors = {_trace_color(t) for t in traces}
+        if len(colors) != 1 or None in colors:
+            continue
+        c = colors.pop()
+        fig.update_layout({axis_name: dict(tickfont=dict(color=c), title=dict(font=dict(color=c)))})
+    # La grilla es la del eje izquierdo. Sin grilla propia, el eje derecho puede tener marcas "redondas":
+    # con tickmode "sync" (el que Plotly usa por defecto en ejes superpuestos) caían en valores como 2.418.
+    fig.update_layout(yaxis2=dict(showgrid=False, tickmode="auto"))
+
+
 def chart_card(fig, title: str, subtitle: str | None = None, footer: str | None = None,
-               height: int = 320, className: str = "") -> html.Div:
+               height: int = 320, className: str = "", graph_id=None) -> html.Div:
     fig.update_layout(height=height)
+    color_dual_axes(fig)
     compact_figure(fig)
-    graph = dcc.Graph(figure=fig, config=GRAPH_CONFIG, style={"height": f"{height}px"})
+    kwargs = {"id": graph_id} if graph_id else {}
+    graph = dcc.Graph(figure=themed_figure(fig), config=GRAPH_CONFIG, style={"height": f"{height}px"}, **kwargs)
     return card(graph, title, subtitle, footer, f"chart-card {className}".strip(), actions=chart_actions())
 
 

@@ -44,6 +44,7 @@
     "#6ea8fe": "#2f6fd6", "#f2c14e": "#c98a00", "#56d364": "#2e9e48", "#ff7b72": "#d1453b",
     "#d2a8ff": "#8a5cc7", "#79c0ff": "#1f8fb8", "#ffa657": "#d9731f",
     "#3fb950": "#2e9e48", "#f85149": "#d1453b", "#8b94a5": "#6b7280", "#2a303c": "#b8c0cc",
+    "#ffffff": "#1f2633", "#e6e9ef": "#1f2633",
   };
   function lightColor(c) {
     if (Array.isArray(c)) return c.map(lightColor);
@@ -185,7 +186,75 @@
       .then(function () { btn.disabled = false; btn.textContent = label; });
   }
 
+  // ------------------------------------------------------------------------
+  // Catálogo de series: filtro, orden por columna y copia del ID
+  // ------------------------------------------------------------------------
+  function norm(t) {
+    return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  document.addEventListener("input", function (ev) {
+    // dcc.Input envuelve el <input> en un div con la clase
+    if (!ev.target.closest || !ev.target.closest(".catalog-filter")) return;
+    var root = ev.target.closest(".catalog");
+    var terms = norm(ev.target.value).split(/\s+/).filter(Boolean);
+    var rows = root.querySelectorAll("tbody tr");
+    var shown = 0;
+    rows.forEach(function (tr) {
+      var text = norm(tr.textContent + " " + (tr.title || ""));
+      var ok = terms.every(function (t) { return text.indexOf(t) !== -1; });
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    var count = root.querySelector(".catalog-count");
+    if (count) count.textContent = terms.length ? shown + " de " + rows.length + " series" : rows.length + " series";
+  });
+
+  function sortKey(td) {
+    var v = td.dataset.sort !== undefined ? td.dataset.sort : td.textContent.trim();
+    var n = Number(v);
+    return v !== "" && !isNaN(n) ? n : norm(v);
+  }
+  function sortCatalog(btn) {
+    var th = btn.closest("th");
+    var table = btn.closest("table");
+    var col = Number(btn.dataset.col);
+    var dir = btn.dataset.dir === "asc" ? "desc" : "asc";
+    table.querySelectorAll(".sort-btn").forEach(function (b) {
+      delete b.dataset.dir;
+      b.closest("th").setAttribute("aria-sort", "none");
+    });
+    btn.dataset.dir = dir;
+    th.setAttribute("aria-sort", dir === "asc" ? "ascending" : "descending");
+    var tbody = table.tBodies[0];
+    var rows = Array.prototype.slice.call(tbody.rows);
+    rows.sort(function (a, b) {
+      var x = sortKey(a.cells[col]), y = sortKey(b.cells[col]);
+      var r = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "es");
+      return dir === "asc" ? r : -r;
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+  }
+  function copyId(btn) {
+    var text = btn.dataset.copy;
+    var done = function () {
+      var label = btn.textContent;
+      btn.textContent = "Copiado";
+      setTimeout(function () { btn.textContent = label; }, 1200);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done).catch(function () {});
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { /* sin portapapeles */ }
+      ta.remove();
+    }
+  }
+
   document.addEventListener("click", function (ev) {
+    var t = ev.target.closest && ev.target.closest(".sort-btn, .copy-id");
+    if (t && t.classList.contains("sort-btn")) { sortCatalog(t); return; }
+    if (t && t.classList.contains("copy-id")) { copyId(t); return; }
     var btn = ev.target.closest && ev.target.closest(".chart-action");
     if (!btn) return;
     var parts = cardParts(btn);

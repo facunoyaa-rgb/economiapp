@@ -32,7 +32,7 @@ from ui.format import (
     fmt_pp,
     fmt_usd_millions,
 )
-from views import actividad, alta_frecuencia, datos, dinero, externo, fiscal, precios, resumen
+from views import actividad, alta_frecuencia, datos, dinero, explorador, externo, fiscal, precios, resumen
 
 
 def test_format_es_ar():
@@ -180,7 +180,7 @@ def test_catalog_and_all_views_render():
     assert len(build_insights(data.df)) >= 3
 
     # Verifica que las 8 pestañas rendericen sus componentes Dash sin excepciones
-    for mod in [resumen, alta_frecuencia, actividad, precios, externo, fiscal, dinero, datos]:
+    for mod in [resumen, alta_frecuencia, actividad, precios, externo, fiscal, dinero, datos, explorador]:
         view_div = mod.layout(data, 5)
         assert view_div is not None
 
@@ -317,3 +317,123 @@ def test_compact_figure_dates_and_long_series():
     assert fig.data[0].x[0] == "2024-01-01"
     assert np.asarray(fig.data[0].y).dtype == np.float32      # serie larga
     assert np.asarray(fig.data[1].y).dtype == np.float64      # serie corta: precisión completa
+
+
+# --------------------------------------------------------------------------- #
+# Fase 3 de la auditoría UX/UI: Explorador, tema claro y doble eje
+# --------------------------------------------------------------------------- #
+def test_explorer_state_roundtrip_and_validation():
+    from views.explorador import DEFAULT_SERIES, parse_state
+
+    valid = {"EMAE_Desestacionalizado", "IPI_Desestacionalizado", "ISAC_Desestacionalizado",
+             "IPC_Nivel_General", "d.TC_Mayorista"}
+    st = parse_state("?p=10&s=IPC_Nivel_General,d.TC_Mayorista,NoExiste,IPC_Nivel_General"
+                     "&t=ia&der=d.TC_Mayorista,EMAE_Desestacionalizado&log=1&base=2020-01-01&desde=nada", valid)
+    assert st.series == ["IPC_Nivel_General", "d.TC_Mayorista"]   # sin desconocidas ni duplicadas
+    assert st.transform == "ia" and st.log
+    assert st.right == ["d.TC_Mayorista"]                          # solo series elegidas
+    assert st.base == "2020-01-01" and st.start is None            # fecha inválida descartada
+    # sin parámetro s: series por defecto; con s vacío: ninguna
+    assert parse_state("?p=5", valid).series == DEFAULT_SERIES
+    assert parse_state("?s=", valid).series == []
+    assert parse_state("?t=raro", valid).transform == "nivel"
+
+
+def test_explorer_transforms():
+    from views.explorador import transform_series
+
+    idx = pd.date_range("2023-01-01", periods=24, freq="MS")
+    level = pd.Series(np.arange(100.0, 124.0), index=idx)
+    mm, _ = transform_series(level, "level", "mm", daily=False)
+    assert mm.iloc[0] == pytest.approx(1.0)                        # 101/100 - 1
+    ia, _ = transform_series(level, "level", "ia", daily=False)
+    assert len(ia) == 12 and ia.iloc[0] == pytest.approx(12.0)     # 112/100 - 1
+    # una tasa varía en puntos porcentuales, no en %
+    rate = pd.Series(np.linspace(10, 33, 24), index=idx)
+    pp, _ = transform_series(rate, "rate", "ia", daily=False)
+    assert pp.iloc[0] == pytest.approx(rate.iloc[12] - rate.iloc[0])
+    # base 100 en la primera fecha disponible desde la base
+    b, _ = transform_series(level, "level", "b100", daily=False, base_date=pd.Timestamp("2023-06-15"))
+    assert b.loc["2023-07-01"] == pytest.approx(100.0)
+    # la suma de 12 meses solo para flujos mensuales
+    s12, _ = transform_series(level, "flow", "s12", daily=False)
+    assert s12.iloc[0] == pytest.approx(sum(range(100, 112)))
+    none, note = transform_series(level, "level", "s12", daily=False)
+    assert none is None and "flujos" in note
+    none, note = transform_series(rate, "rate", "b100", daily=False)
+    assert none is None and note
+    # variación % con base negativa: no definida
+    neg = pd.Series([-10.0, 5.0], index=idx[:2])
+    v, note = transform_series(neg, "flow", "mm", daily=False)
+    assert v.empty and note
+
+
+def test_explorer_daily_lag_tolerates_weekends():
+    from views.explorador import transform_series
+
+    days = pd.bdate_range("2024-01-01", "2025-03-31")
+    s = pd.Series(np.linspace(800, 1200, len(days)), index=days)
+    ia, _ = transform_series(s, "level", "ia", daily=True)
+    # 2025-01-06 (lunes) se compara con el último hábil hasta 2024-01-06 (sábado) -> viernes 2024-01-05
+    expected = (s.loc["2025-01-06"] / s.loc["2024-01-05"] - 1) * 100
+    assert ia.loc["2025-01-06"] == pytest.approx(expected)
+
+
+def test_explorer_build_with_real_data():
+    from views.explorador import ExplorerState, build, series_options
+
+    data = get_macro_data(force=False)
+    opts = series_options(data)
+    values = {o["value"] for o in opts}
+    assert "IPC_Variacion_Mensual" not in values and "d.TC_Mayorista" in values
+    st = ExplorerState(series=["Inflacion_Mensual_Pct", "d.TC_Mayorista"], transform="ia",
+                       right=["d.TC_Mayorista"])
+    res = build(data, st, 5)
+    assert res.fig is not None and len(res.fig.data) == 2
+    assert res.fig.data[1].yaxis == "y2"
+    assert "p.p." in res.fig.layout.yaxis.title.text            # la inflación ya es una tasa
+    assert len(res.stats) == 2
+
+
+def test_dual_axis_takes_series_color():
+    import plotly.graph_objects as go
+    from ui.components import color_dual_axes
+
+    fig = go.Figure()
+    fig.add_scatter(x=[1, 2], y=[1, 2], line=dict(color="#111111"))
+    fig.add_scatter(x=[1, 2], y=[3, 4], line=dict(color="#222222"), yaxis="y2")
+    fig.update_layout(yaxis2=dict(overlaying="y", side="right"))
+    color_dual_axes(fig)
+    assert fig.layout.yaxis.tickfont.color == "#111111"
+    assert fig.layout.yaxis2.tickfont.color == "#222222"
+    assert fig.layout.yaxis2.title.font.color == "#222222"
+    assert fig.layout.yaxis2.tickmode == "auto" and fig.layout.yaxis2.showgrid is False
+
+
+def test_light_theme_recolors_figure():
+    import plotly.graph_objects as go
+    from ui.theme import COLORS, LIGHT_COLORS, SERIES, LIGHT_SERIES, set_theme, themed_figure
+
+    fig = go.Figure()
+    fig.add_scatter(x=[1, 2], y=[1, 2], line=dict(color=SERIES[1]), fill="tozeroy",
+                    fillcolor="rgba(255, 123, 114, 0.08)")
+    fig.update_layout(yaxis=dict(tickfont=dict(color=COLORS["muted"])))
+    set_theme("dark")
+    assert themed_figure(fig) is fig
+    set_theme("light")
+    try:
+        d = themed_figure(fig)
+        assert d["data"][0]["line"]["color"] == LIGHT_SERIES[1]
+        assert d["data"][0]["fillcolor"] == "rgba(209, 69, 59, 0.08)"
+        assert d["layout"]["yaxis"]["tickfont"]["color"] == LIGHT_COLORS["muted"]
+        assert d["layout"]["template"]["layout"]["font"]["color"] == LIGHT_COLORS["text"]
+    finally:
+        set_theme("dark")
+    assert set_theme("cualquiera") == "dark"
+
+
+def test_last_date_uses_daily_panel():
+    data = get_macro_data(force=False)
+    assert data.is_daily("TC_Mayorista") and not data.is_daily("EMAE_Original")
+    last = data.last_date("TC_Mayorista")
+    assert last == data.daily_df.loc[data.daily_df["TC_Mayorista"].notna(), "Fecha"].max()

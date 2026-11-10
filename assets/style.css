@@ -1,5 +1,6 @@
 /* ==========================================================================
-   Dashboard Macro Argentina - Dark Theme Stylesheet (Dash)
+   EconomiApp - hoja de estilos (tema oscuro por defecto y tema claro)
+   Los colores de los gráficos están en ui/theme.py: mantener sincronizados.
    ========================================================================== */
 
 :root {
@@ -14,9 +15,70 @@
   --good: #3fb950;
   --warn: #d29922;
   --bad: #f85149;
+  --topbar-bg: rgba(22, 26, 34, 0.92);
+  --hover-bg: #232a37;
+  --hairline: rgba(255, 255, 255, 0.05);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55);
+  --warn-bg: rgba(210, 153, 34, 0.14);
+  --warn-text: #f2cc60;
+  --info-bg: rgba(110, 168, 254, 0.12);
+  --info-text: #a9c8ff;
+  --bad-bg: rgba(248, 81, 73, 0.14);
+  --bad-text: #ffa198;
+  color-scheme: dark;
+  /* Componentes de Dash 4 (Dropdown, selectores de fecha, Checklist) */
+  --Dash-Fill-Inverse-Strong: var(--surface-2);
+  --Dash-Fill-Interactive-Strong: var(--accent);
+  --Dash-Fill-Interactive-Weak: rgba(110, 168, 254, 0.08);
+  --Dash-Fill-Primary-Hover: rgba(255, 255, 255, 0.05);
+  --Dash-Fill-Primary-Active: rgba(110, 168, 254, 0.16);
+  --Dash-Fill-Disabled: rgba(255, 255, 255, 0.06);
+  --Dash-Stroke-Strong: var(--border-hover);
+  --Dash-Stroke-Weak: var(--border);
+  --Dash-Text-Strong: var(--text);
+  --Dash-Text-Primary: var(--text);
+  --Dash-Text-Weak: var(--muted);
+  --Dash-Text-Disabled: var(--muted);
+  --Dash-Shading-Strong: rgba(0, 0, 0, 0.5);
+  --Dash-Shading-Weak: rgba(0, 0, 0, 0.35);
   --radius: 12px;
   --radius-sm: 8px;
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Tema claro: el botón ☀/☾ de la barra superior pone data-theme="light" en <html> */
+:root[data-theme="light"] {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-2: #f0f3f7;
+  --border: #d5dbe3;
+  --border-hover: #aab4c2;
+  --text: #1f2633;
+  --muted: #5b6475;
+  --accent: #2f6fd6;
+  --good: #1f883d;
+  --warn: #9a6700;
+  --bad: #cf222e;
+  --topbar-bg: rgba(255, 255, 255, 0.94);
+  --hover-bg: #e8edf3;
+  --hairline: rgba(31, 38, 51, 0.08);
+  --shadow-sm: 0 1px 2px rgba(31, 38, 51, 0.12);
+  --shadow-pop: 0 12px 32px rgba(31, 38, 51, 0.16);
+  --warn-bg: #fff4d6;
+  --warn-text: #7a5200;
+  --info-bg: #e3edfd;
+  --info-text: #1d4f9e;
+  --bad-bg: #ffe5e3;
+  --bad-text: #a1151f;
+  --Dash-Fill-Inverse-Strong: #ffffff;
+  --Dash-Fill-Interactive-Weak: rgba(47, 111, 214, 0.06);
+  --Dash-Fill-Primary-Hover: rgba(31, 38, 51, 0.04);
+  --Dash-Fill-Primary-Active: rgba(47, 111, 214, 0.12);
+  --Dash-Fill-Disabled: rgba(31, 38, 51, 0.06);
+  --Dash-Shading-Strong: rgba(31, 38, 51, 0.25);
+  --Dash-Shading-Weak: rgba(31, 38, 51, 0.15);
+  color-scheme: light;
 }
 
 *, *::before, *::after {
@@ -52,7 +114,7 @@ html, body {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 1.75rem;
-  background: rgba(22, 26, 34, 0.92);
+  background: var(--topbar-bg);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
@@ -167,7 +229,7 @@ html, body {
 .segmented label:has(input[type="radio"]:checked) {
   background: var(--surface-2);
   color: var(--accent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Refresh Button */
@@ -185,7 +247,7 @@ html, body {
 }
 .btn:hover {
   border-color: var(--accent);
-  background: #232a37;
+  background: var(--hover-bg);
 }
 
 /* --------------------------------------------------------------------------
@@ -227,7 +289,7 @@ html, body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.85rem 1rem;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--shadow-pop);
   z-index: 100;
   font-size: 0.78rem;
   display: flex;
@@ -282,16 +344,16 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 .banner--warn {
-  background: rgba(210, 153, 34, 0.14);
-  color: #f2cc60;
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .banner--info {
-  background: rgba(110, 168, 254, 0.12);
-  color: #a9c8ff;
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 .banner--bad {
-  background: rgba(248, 81, 73, 0.14);
-  color: #ffa198;
+  background: var(--bad-bg);
+  color: var(--bad-text);
 }
 
 /* --------------------------------------------------------------------------
@@ -507,7 +569,7 @@ summary:focus-visible,
   background: var(--surface-2);
   border: 1px solid var(--border-hover);
   border-radius: var(--radius-sm);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-pop);
   color: var(--text);
   font-size: 0.75rem;
   font-weight: 400;
@@ -577,7 +639,7 @@ summary:focus-visible,
 .kpi-date {
   font-size: 0.7rem;
   color: var(--muted);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--hairline);
   padding-top: 0.35rem;
 }
 
@@ -663,7 +725,7 @@ summary:focus-visible,
 .card-footer {
   font-size: 0.72rem;
   color: var(--muted);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--hairline);
   padding-top: 0.45rem;
 }
 
@@ -689,7 +751,7 @@ summary:focus-visible,
   padding: 0.5rem 0.65rem;
   background: var(--surface-2);
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hairline);
 }
 
 .insight .dot {
@@ -753,7 +815,7 @@ summary:focus-visible,
   padding: 0.6rem 0.8rem;
   background: var(--surface-2);
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hairline);
   max-width: 110ch;
 }
 
@@ -788,4 +850,137 @@ summary:focus-visible,
   top: 0;
   background: var(--surface);
   z-index: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Botón de tema
+   -------------------------------------------------------------------------- */
+.btn--icon {
+  min-width: 2.4rem;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Explorador
+   -------------------------------------------------------------------------- */
+.explorer-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem 1.25rem;
+  align-items: start;
+}
+.explorer-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.explorer-control--wide { grid-column: 1 / -1; }
+.explorer-control--transform { grid-column: span 3; }
+@media (max-width: 1100px) { .explorer-control--transform { grid-column: 1 / -1; } }
+.explorer-control .segmented { flex-wrap: wrap; }
+.explorer-help {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  max-width: 110ch;
+}
+.explorer-notes {
+  margin: -0.25rem 0 1rem;
+  padding: 0.6rem 1rem 0.6rem 2rem;
+  font-size: 0.82rem;
+  color: var(--warn-text);
+  background: var(--warn-bg);
+  border-radius: var(--radius-sm);
+}
+.explorer-stats td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cell-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 0.5rem;
+  vertical-align: baseline;
+}
+.checklist label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   Catálogo de series
+   -------------------------------------------------------------------------- */
+.catalog-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.catalog-filter {
+  flex: 1 1 320px;
+  max-width: 480px;
+}
+.catalog-filter input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+.catalog-filter input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.catalog-count { font-size: 0.8rem; color: var(--muted); }
+.sort-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.sort-btn::after { content: "↕"; opacity: 0.35; font-size: 0.75em; }
+.sort-btn[data-dir="asc"]::after { content: "▲"; opacity: 0.9; }
+.sort-btn[data-dir="desc"]::after { content: "▼"; opacity: 0.9; }
+.sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.copy-id {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.copy-id:hover, .copy-id:focus-visible { color: var(--text); border-color: var(--border-hover); }
+.explore-link {
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.explore-link:hover { text-decoration: underline; }
+.series-col { font-size: 0.72rem; color: var(--muted); display: block; }
+
+:root[data-theme="light"] .flag { border-color: var(--border); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

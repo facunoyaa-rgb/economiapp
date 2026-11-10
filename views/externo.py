@@ -143,7 +143,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                 [
                     chart_or_empty(
                         f_exp, "Exportaciones por grandes rubros y balanza energética",
-                        "Barras apiladas: PP, MOA, MOI y Combustibles. Línea blanca: Saldo comercial energético.",
+                        "Barras apiladas: PP, MOA, MOI y Combustibles. Línea: saldo comercial energético.",
                         "Fuente: INDEC, Intercambio Comercial Argentino (ICA)."),
                     chart_or_empty(
                         f_imp, "Importaciones por uso económico (CIF)",

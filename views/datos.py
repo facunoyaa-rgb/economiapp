@@ -3,10 +3,22 @@ from __future__ import annotations
 
 from dash import dcc, html
 
+from series_meta import HIDDEN, meta
+
 from pipeline import CSV_FALLBACK, ERROR, FROM_CACHE, MacroData
 from ui.components import card
 from ui.format import fmt_ago, fmt_day, fmt_int, fmt_month
 
+
+# Nombre corto del proveedor para la tabla (el largo va en las tarjetas de resumen)
+PROVIDER_SHORT = {
+    "datos_gob_ar": "datos.gob.ar",
+    "bcra_v4": "BCRA",
+    "bluelytics": "Bluelytics",
+    "xlsx_bcra_itcrm": "BCRA (planilla ITCRM)",
+    "xls_indec_uci": "INDEC (planilla UCI)",
+    "scraper_ambito_rava": "Ámbito / Rava",
+}
 
 PROVIDER_NAMES = {
     "datos_gob_ar": "API Series de Tiempo (datos.gob.ar + Catálogo SSPM)",
@@ -55,25 +67,37 @@ def _provider_summary_cards(data: MacroData) -> html.Div:
 
 def layout(data: MacroData, years: int | None = None) -> html.Div:
     rows = []
-    for col, s in data.series_status.items():
-        freq = s.get("frequency", "M")
-        ult = s.get("ultimo_dato")
-        ult_str = (fmt_day(ult) if freq == "D" else fmt_month(ult)) if ult else "—"
-        prov = s.get("provider", "datos_gob_ar")
+    for col, st in sorted(data.series_status.items(), key=lambda kv: (meta(kv[0]).group, meta(kv[0]).label)):
+        m = meta(col)
+        daily = data.is_daily(col)
+        ult = data.last_date(col)
+        ult_str = "—" if ult is None else (fmt_day(ult) if daily else fmt_month(ult))
+        prov = st.get("provider", "datos_gob_ar")
+        sid = str(st.get("id", ""))
+        explore = None
+        if col not in HIDDEN and st.get("estado") != ERROR:
+            key = f"d.{col}" if daily else col
+            explore = dcc.Link("Explorar →", href=f"?s={key}#explorador", className="explore-link",
+                               title=f"Abrir {m.label} en el Explorador")
         rows.append(
             html.Tr(
                 [
-                    html.Td(html.Strong(col.replace("_", " "))),
-                    html.Td(prov),
-                    html.Td(html.Code(str(s.get("id", "")), className="series-id")),
-                    html.Td("Diaria" if freq == "D" else "Mensual"),
-                    html.Td(s.get("unidad", "—")),
-                    html.Td(STATUS_LABELS.get(s.get("estado", ""), s.get("estado", "")),
-                            className=f"st st--{s.get('estado', '')}"),
-                    html.Td(fmt_int(s.get("observaciones", 0))),
-                    html.Td(ult_str),
-                    html.Td(s.get("descripcion", ""), className="muted"),
-                ]
+                    html.Td([html.Strong(m.label), html.Span(col, className="series-col")],
+                            **{"data-sort": m.label}),
+                    html.Td(m.group),
+                    html.Td(PROVIDER_SHORT.get(prov, prov), title=PROVIDER_NAMES.get(prov, prov)),
+                    html.Td([html.Code(sid, className="series-id"),
+                             html.Button("Copiar", type="button", className="copy-id",
+                                         **{"data-copy": sid, "aria-label": f"Copiar el ID {sid}"})] if sid else "—"),
+                    html.Td(str(st.get("frecuencia", "mensual")).capitalize()),
+                    html.Td(st.get("unidad", "—")),
+                    html.Td(STATUS_LABELS.get(st.get("estado", ""), st.get("estado", "")),
+                            className=f"st st--{st.get('estado', '')}"),
+                    html.Td(fmt_int(st.get("observaciones", 0)), **{"data-sort": str(st.get("observaciones", 0))}),
+                    html.Td(ult_str, **{"data-sort": ult.strftime("%Y-%m-%d") if ult is not None else ""}),
+                    html.Td(explore),
+                ],
+                title=st.get("descripcion", ""),
             )
         )
 
@@ -148,29 +172,35 @@ def layout(data: MacroData, years: int | None = None) -> html.Div:
         className="export-bar",
     )
 
+    headers = ["Serie", "Grupo", "Proveedor", "ID en la fuente", "Frecuencia", "Unidad", "Estado", "Obs.",
+               "Último dato", ""]
     table = html.Div(
-        html.Table(
-            [
-                html.Thead(
-                    html.Tr(
-                        [
-                            html.Th("Serie"),
-                            html.Th("Proveedor"),
-                            html.Th("ID / Fuente"),
-                            html.Th("Frecuencia"),
-                            html.Th("Unidad"),
-                            html.Th("Estado"),
-                            html.Th("Obs."),
-                            html.Th("Último dato"),
-                            html.Th("Descripción"),
-                        ]
-                    )
+        [
+            html.Div(
+                [html.Label("Filtrar el catálogo", htmlFor="catalog-filter", className="sr-only"),
+                 # El filtro corre en assets/ui.js: no hay callback y el valor no viaja al servidor
+                 dcc.Input(id="catalog-filter", type="search", className="catalog-filter", autoComplete="off",
+                           placeholder="Filtrar por nombre, grupo, proveedor, ID o estado…", debounce=True),
+                 html.Span(f"{len(rows)} series", className="catalog-count", **{"aria-live": "polite"})],
+                className="catalog-tools",
+            ),
+            html.Div(
+                html.Table(
+                    [
+                        html.Thead(html.Tr([
+                            html.Th(html.Button(h, type="button", className="sort-btn",
+                                                **{"data-col": str(i)}) if h else h,
+                                    **({"aria-sort": "none"} if h else {}))
+                            for i, h in enumerate(headers)
+                        ])),
+                        html.Tbody(rows),
+                    ],
+                    className="status-table catalog-table",
                 ),
-                html.Tbody(rows),
-            ],
-            className="status-table",
-        ),
-        className="table-scroll",
+                className="table-scroll",
+            ),
+        ],
+        className="catalog",
     )
 
     return html.Div(
@@ -184,8 +214,9 @@ def layout(data: MacroData, years: int | None = None) -> html.Div:
             _provider_summary_cards(data),
             card(export_bar, "Descarga de datos (CSV)"),
             card(methodology_notes, "Notas metodológicas y transformaciones"),
-            card(table, f"Catálogo completo de series ({data.n_ok}/{data.n_total} operativas)",
-                 "Detalle de proveedor, identificador técnico, frecuencia nativa y cobertura temporal."),
+            card(table, f"Catálogo de series ({data.n_ok}/{data.n_total} operativas)",
+                 "Clic en un encabezado para ordenar. Pasá el mouse sobre una fila para ver la descripción "
+                 "oficial; «Explorar» abre la serie en el Explorador."),
         ],
         className="view",
     )
