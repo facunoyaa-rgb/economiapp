@@ -7,25 +7,9 @@ from dash import html
 
 from indicators import build_externo_kpis, real_base_month
 from pipeline import MacroData
-from ui.components import card, chart_card, empty_state, kpi_grid
+from ui.charts import chart_or_empty, trim, window
+from ui.components import kpi_grid
 from ui.theme import COLORS, SERIES
-
-
-def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if not years or df.empty:
-        return df
-    start = df["Fecha"].max() - pd.DateOffset(years=years)
-    return df[df["Fecha"] > start]
-
-
-def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    present = [c for c in cols if c in df]
-    if not present or df.empty:
-        return df.iloc[0:0]
-    mask = df[present].notna().any(axis=1)
-    if not mask.any():
-        return df.iloc[0:0]
-    return df.loc[mask.idxmax(): mask[::-1].idxmax()]
 
 
 def fig_exportaciones_rubros_y_energia(df: pd.DataFrame) -> go.Figure | None:
@@ -35,7 +19,7 @@ def fig_exportaciones_rubros_y_energia(df: pd.DataFrame) -> go.Figure | None:
         ("Expo_MOI", "Manuf. Origen Industrial (MOI)", SERIES[0]),
         ("Expo_Combustibles_Energia", "Combustibles y Energía (CyE)", SERIES[4]),
     ]
-    d = _trim(df, [c[0] for c in cols] + ["Balanza_Energetica"])
+    d = trim(df, [c[0] for c in cols] + ["Balanza_Energetica"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -63,7 +47,7 @@ def fig_importaciones_usos(df: pd.DataFrame) -> go.Figure | None:
         ("Impo_Bienes_Consumo", "Bienes de Consumo", SERIES[1]),
         ("Impo_Combustibles", "Combustibles y Lubricantes", SERIES[3]),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -84,7 +68,7 @@ def fig_itcrm_competitividad(df: pd.DataFrame) -> go.Figure | None:
         ("ITCRB_Brasil", "ITCRB Bilateral Brasil", SERIES[2], 1.8, "dot"),
         ("ITCRB_EEUU", "ITCRB Bilateral EE.UU.", SERIES[1], 1.8, "dash"),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -106,7 +90,7 @@ def fig_itcrm_competitividad(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_tc_real_y_brecha(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["TC_Mayorista_Real", "Dolar_Blue_Real", "Brecha_Cambiaria_Pct"])
+    d = trim(df, ["TC_Mayorista_Real", "Dolar_Blue_Real", "Brecha_Cambiaria_Pct"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -137,16 +121,9 @@ def fig_tc_real_y_brecha(df: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
-def _chart_or_empty(fig, title, subtitle=None, footer=None, height=330, className=""):
-    if fig is None:
-        return card(empty_state("Sin datos disponibles para el período seleccionado."), title, subtitle,
-                    className=className)
-    return chart_card(fig, title, subtitle, footer, height, className)
-
-
 def layout(data: MacroData, years: int | None) -> html.Div:
     df = data.df
-    win = _window(df, years)
+    win = window(df, years)
 
     f_exp = fig_exportaciones_rubros_y_energia(win)
     f_imp = fig_importaciones_usos(win)
@@ -164,11 +141,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             kpi_grid(build_externo_kpis(df)),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_exp, "Exportaciones por grandes rubros y balanza energética",
                         "Barras apiladas: PP, MOA, MOI y Combustibles. Línea blanca: Saldo comercial energético.",
                         "Fuente: INDEC, Intercambio Comercial Argentino (ICA)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_imp, "Importaciones por uso económico (CIF)",
                         "Evolución mensual de compras externas de bienes intermedios, de capital, consumo y energía.",
                         "Fuente: INDEC, Intercambio Comercial Argentino (ICA)."),
@@ -177,11 +154,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_itc, "Competitividad cambiaria: ITCRM multilateral y bilaterales",
                         "Índice de Tipo de Cambio Real Multilateral y bilaterales con Brasil y EE.UU. (17/12/2015 = 100).",
                         "Fuente: BCRA (Planilla oficial ITCRMSerie.xlsx)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_tcr, "Dólar oficial y libre a precios constantes (IPC) y brecha cambiaria",
                         "Cotizaciones históricas expresadas en pesos de poder adquisitivo actual y brecha porcentual.",
                         "Fuente: BCRA, Bluelytics e INDEC (IPC)."),

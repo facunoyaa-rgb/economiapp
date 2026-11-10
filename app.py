@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import os
 
-from dash import Dash, Input, Output, callback, ctx, dcc, html, no_update
+from dash import ALL, Dash, Input, Output, State, callback, clientside_callback, ctx, dcc, html, no_update
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import ui.theme  # noqa: F401  (registra el template de Plotly)
@@ -18,18 +18,58 @@ from views import actividad, alta_frecuencia, datos, dinero, externo, fiscal, pr
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
+APP_NAME = "EconomiApp"
+APP_DESCRIPTION = ("Tablero de coyuntura macroeconómica argentina: actividad, precios, tasas, sector externo, "
+                   "fiscal, dinero y salarios, con 77 series oficiales y de mercado.")
+PUBLIC_URL = os.environ.get("ECONOMIAPP_PUBLIC_URL", "https://economiapp.noya.com.ar").rstrip("/")
+REPO_URL = "https://github.com/facunoyaa-rgb/economiapp"
+AUTHOR = os.environ.get("ECONOMIAPP_AUTHOR", "Facundo Octavio Noya, Lic. en Economía")
+
 app = Dash(
     __name__,
-    title="Macro Argentina",
+    title=APP_NAME,
     update_title=None,
     external_stylesheets=[
         "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
     ],
     external_scripts=["https://cdn.plot.ly/plotly-locale-es-latest.js"],
     suppress_callback_exceptions=True,
+    # Carga plotly.js junto con el resto de los scripts, en vez de pedirlo recién después del primer callback.
+    eager_loading=True,
 )
 server = app.server
 server.wsgi_app = ProxyFix(server.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+app.index_string = f"""<!DOCTYPE html>
+<html lang="es-AR">
+    <head>
+        {{%metas%}}
+        <title>{{%title%}}</title>
+        <meta name="description" content="{APP_DESCRIPTION}">
+        <meta name="theme-color" content="#0e1117">
+        <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+        <meta property="og:type" content="website">
+        <meta property="og:locale" content="es_AR">
+        <meta property="og:site_name" content="{APP_NAME}">
+        <meta property="og:title" content="{APP_NAME} · Coyuntura macroeconómica argentina">
+        <meta property="og:description" content="{APP_DESCRIPTION}">
+        <meta property="og:url" content="{PUBLIC_URL}/">
+        <meta property="og:image" content="{PUBLIC_URL}/assets/og-image.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta name="twitter:card" content="summary_large_image">
+        {{%favicon%}}
+        {{%css%}}
+    </head>
+    <body>
+        {{%app_entry%}}
+        <footer>
+            {{%config%}}
+            {{%scripts%}}
+            {{%renderer%}}
+        </footer>
+    </body>
+</html>"""
 
 RANGE_OPTIONS = [
     {"label": "1A", "value": 1},
@@ -38,17 +78,21 @@ RANGE_OPTIONS = [
     {"label": "10A", "value": 10},
     {"label": "Máx", "value": 0},
 ]
+RANGE_VALUES = {o["value"] for o in RANGE_OPTIONS}
+DEFAULT_RANGE = 5
 
+# (clave interna de la vista, fragmento de la URL, etiqueta)
 TABS = [
-    ("resumen", "Resumen", False),
-    ("alta_frecuencia", "Alta frecuencia (diario)", False),
-    ("actividad", "Actividad", False),
-    ("precios", "Precios y tasas", False),
-    ("externo", "Sector externo", False),
-    ("fiscal", "Fiscal", False),
-    ("dinero", "Dinero, crédito y salarios", False),
-    ("datos", "Datos y metodología", False),
+    ("resumen", "resumen", "Resumen"),
+    ("alta_frecuencia", "alta-frecuencia", "Alta frecuencia (diario)"),
+    ("actividad", "actividad", "Actividad"),
+    ("precios", "precios", "Precios y tasas"),
+    ("externo", "externo", "Sector externo"),
+    ("fiscal", "fiscal", "Fiscal"),
+    ("dinero", "dinero", "Dinero, crédito y salarios"),
+    ("datos", "datos", "Datos y metodología"),
 ]
+HASH_TO_VIEW = {slug: key for key, slug, _ in TABS}
 
 STATUS_LABEL = {
     "ok": "OK",
@@ -58,34 +102,43 @@ STATUS_LABEL = {
 }
 
 
+def view_from_hash(hash_: str | None) -> str:
+    """'#fiscal' -> 'fiscal'. Un fragmento vacío o desconocido abre el Resumen."""
+    return HASH_TO_VIEW.get((hash_ or "").lstrip("#"), "resumen")
+
+
 # --------------------------------------------------------------------------- #
 # Layout
 # --------------------------------------------------------------------------- #
 def header() -> html.Header:
     return html.Header(
         [
-            html.Div(
+            html.A(
                 [
                     html.Div([html.Span(), html.Span(), html.Span()], className="flag", **{"aria-hidden": "true"}),
                     html.Div(
-                        [html.H1("Macro Argentina", className="brand-title"),
+                        [html.H1(APP_NAME, className="brand-title"),
                          html.Span("Coyuntura macroeconómica argentina · 77 series oficiales y de mercado",
                                    className="brand-sub")],
                     ),
                 ],
+                href="#resumen",
                 className="brand",
+                title="Ir al Resumen",
             ),
             html.Div(
                 [
                     html.Div(
-                        [html.Span("Período", className="control-label"),
-                         dcc.RadioItems(id="range", options=RANGE_OPTIONS, value=5, inline=True,
+                        [html.Span("Período", className="control-label", id="range-label"),
+                         dcc.RadioItems(id="range", options=RANGE_OPTIONS, value=DEFAULT_RANGE, inline=True,
                                         className="segmented", persistence=True, persistence_type="local")],
                         className="control",
+                        role="radiogroup",
+                        **{"aria-labelledby": "range-label"},
                     ),
                     html.Div(id="data-status", className="status"),
                     html.Button("↻ Actualizar", id="refresh", n_clicks=0, className="btn",
-                                title="Forzar descarga desde las fuentes remotas"),
+                                title="Volver a descargar los datos de las fuentes (como máximo cada 15 min)"),
                 ],
                 className="toolbar",
             ),
@@ -94,33 +147,100 @@ def header() -> html.Header:
     )
 
 
+def nav() -> html.Nav:
+    return html.Nav(
+        [html.A(label, href=f"#{slug}", id={"type": "nav-link", "index": slug}, className="nav-link")
+         for _, slug, label in TABS],
+        className="nav",
+        **{"aria-label": "Secciones del tablero"},
+    )
+
+
+def footer() -> html.Footer:
+    about = [html.Strong(APP_NAME), " · "]
+    if AUTHOR:
+        about += [f"Desarrollada por {AUTHOR}", " · "]
+    about += ["Python, Dash, Plotly y pandas · ",
+              html.A("Código en GitHub", href=REPO_URL, target="_blank", rel="noopener")]
+    return html.Footer(
+        [
+            html.P(about, className="footer-about"),
+            html.P(
+                ["Fuentes: INDEC, BCRA, Secretaría de Hacienda, Secretaría de Trabajo (vía ",
+                 html.A("apis.datos.gob.ar", href="https://apis.datos.gob.ar/series/api/docs/", target="_blank",
+                        rel="noopener"),
+                 "), Bluelytics, DolarAPI, Ámbito y Rava. Los valores reales se expresan en pesos del último mes "
+                 "con IPC publicado."],
+            ),
+        ],
+        className="footer",
+    )
+
+
 app.layout = html.Div(
     [
+        dcc.Location(id="url", refresh=False),
+        html.A("Saltar al contenido", href="#contenido", className="skip-link"),
         header(),
-        html.Div(id="banner"),
+        html.Div(id="banner", role="status"),
         html.Main(
             [
-                dcc.Tabs(
-                    id="tabs", value="resumen", className="tabs", parent_className="tabs-wrap",
-                    children=[
-                        dcc.Tab(label=label + (" · pronto" if disabled else ""), value=value, disabled=disabled,
-                                className="tab", selected_className="tab--selected",
-                                disabled_className="tab--disabled")
-                        for value, label, disabled in TABS
-                    ],
-                ),
-                dcc.Loading(html.Div(id="tab-content"), type="dot", color="#6ea8fe", delay_show=300),
+                nav(),
+                dcc.Loading(html.Div(id="tab-content"), type="dot", color="#6ea8fe", delay_show=300,
+                            parent_className="loading-wrap"),
             ],
             className="main",
+            id="contenido",
         ),
-        html.Footer(
-            ["Fuentes: INDEC, BCRA, Secretaría de Hacienda, Secretaría de Trabajo, ",
-             html.A("apis.datos.gob.ar", href="https://apis.datos.gob.ar/series/api/docs/", target="_blank", rel="noopener"),
-             ", Bluelytics, DolarAPI, Ámbito y Rava. Los valores reales se expresan en pesos del último mes con IPC publicado."],
-            className="footer",
-        ),
+        footer(),
     ],
     className="app",
+)
+
+# Enlace activo de la navegación (en el navegador, sin ida al servidor)
+clientside_callback(
+    """
+    function(hash, ids) {
+        var slug = (hash || "").replace(/^#/, "");
+        var known = ids.map(function (i) { return i.index; });
+        if (known.indexOf(slug) === -1) { slug = "resumen"; }
+        return ids.map(function (i) {
+            var a = document.getElementById(JSON.stringify({index: i.index, type: "nav-link"}));
+            if (a) { if (i.index === slug) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
+            return i.index === slug ? "nav-link nav-link--active" : "nav-link";
+        });
+    }
+    """,
+    Output({"type": "nav-link", "index": ALL}, "className"),
+    Input("url", "hash"),
+    State({"type": "nav-link", "index": ALL}, "id"),
+)
+
+# Período <-> ?p= en la URL. Es un solo callback para que la dependencia circular sea válida.
+clientside_callback(
+    """
+    function(search, value) {
+        var NU = window.dash_clientside.no_update;
+        var allowed = %s;
+        var trig = (dash_clientside.callback_context.triggered || []).map(function (t) { return t.prop_id; });
+        var m = /[?&]p=(\\d+)/.exec(search || "");
+        var fromUrl = m ? parseInt(m[1], 10) : null;
+        if (fromUrl !== null && allowed.indexOf(fromUrl) === -1) { fromUrl = null; }
+        var rangeChanged = trig.indexOf("range.value") !== -1;
+        var urlChanged = trig.indexOf("url.search") !== -1;
+        if (rangeChanged && !urlChanged) {
+            return [NU, fromUrl === value ? NU : "?p=" + value];
+        }
+        if (fromUrl !== null) {
+            return [fromUrl === value ? NU : fromUrl, NU];
+        }
+        return [NU, "?p=" + value];
+    }
+    """ % sorted(RANGE_VALUES),
+    Output("range", "value"),
+    Output("url", "search"),
+    Input("url", "search"),
+    Input("range", "value"),
 )
 
 
@@ -195,6 +315,12 @@ def status_view(data: MacroData) -> html.Details:
 
 
 def banner_view(data: MacroData):
+    if data.refresh_skipped:
+        return html.Div(
+            f"Los datos ya están al día: se descargaron {fmt_ago(data.fetched_at)}. Para no saturar a las fuentes, "
+            f"se vuelven a pedir como máximo cada {data.min_refresh_minutes} minutos.",
+            className="banner banner--info",
+        )
     if data.source == "cache_desactualizada":
         return html.Div(
             f"No se pudo conectar con las fuentes remotas. Se muestran datos guardados {fmt_ago(data.fetched_at)}.",
@@ -225,11 +351,16 @@ VIEW_MAP = {
     Output("tab-content", "children"),
     Output("data-status", "children"),
     Output("banner", "children"),
-    Input("tabs", "value"),
+    Input("url", "hash"),
     Input("range", "value"),
     Input("refresh", "n_clicks"),
+    running=[
+        (Output("refresh", "disabled"), True, False),
+        (Output("refresh", "children"), "Actualizando…", "↻ Actualizar"),
+    ],
 )
-def render(tab: str, years: int, _clicks: int):
+def render(hash_: str | None, years: int, _clicks: int):
+    tab = view_from_hash(hash_)
     try:
         force = ctx.triggered_id == "refresh"
     except Exception:  # noqa: BLE001

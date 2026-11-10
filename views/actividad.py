@@ -7,31 +7,15 @@ from dash import html
 
 from indicators import build_actividad_kpis, change_pct, last_obs
 from pipeline import MacroData
-from ui.components import card, chart_card, empty_state, kpi_grid
+from ui.charts import chart_or_empty, trim, window
+from ui.components import kpi_grid
 from ui.format import fmt_month
 from ui.theme import COLORS, SERIES
 
 
-def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if not years or df.empty:
-        return df
-    start = df["Fecha"].max() - pd.DateOffset(years=years)
-    return df[df["Fecha"] > start]
-
-
-def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    present = [c for c in cols if c in df]
-    if not present or df.empty:
-        return df.iloc[0:0]
-    mask = df[present].notna().any(axis=1)
-    if not mask.any():
-        return df.iloc[0:0]
-    return df.loc[mask.idxmax(): mask[::-1].idxmax()]
-
-
 def fig_emae_series(df: pd.DataFrame) -> go.Figure | None:
     cols = ["EMAE_Original", "EMAE_Desestacionalizado", "EMAE_Tendencia_Ciclo"]
-    d = _trim(df, cols)
+    d = trim(df, cols)
     if d.empty:
         return None
     fig = go.Figure()
@@ -78,6 +62,7 @@ def fig_semaforo_sectorial(df: pd.DataFrame) -> go.Figure | None:
             x=vals,
             y=labels,
             orientation="h",
+            name="Variación % i.a.",
             marker_color=colors,
             marker_opacity=0.85,
             texttemplate="%{x:+.1f}%",  # respeta separators (coma decimal)
@@ -123,7 +108,7 @@ def fig_industria_construccion_consumo(df: pd.DataFrame) -> tuple[go.Figure | No
 
 
 def fig_uci_industria(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["UCI_Industria"])
+    d = trim(df, ["UCI_Industria"])
     if d.empty:
         return None
     avg = float(d["UCI_Industria"].dropna().mean())
@@ -141,16 +126,9 @@ def fig_uci_industria(df: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
-def _chart_or_empty(fig, title, subtitle=None, footer=None, height=330, className=""):
-    if fig is None:
-        return card(empty_state("Sin datos disponibles para el período seleccionado."), title, subtitle,
-                    className=className)
-    return chart_card(fig, title, subtitle, footer, height, className)
-
-
 def layout(data: MacroData, years: int | None) -> html.Div:
     df = data.df
-    win = _window(df, years)
+    win = window(df, years)
 
     f_emae = fig_emae_series(win)
     f_sec = fig_semaforo_sectorial(df)
@@ -168,11 +146,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             kpi_grid(build_actividad_kpis(df)),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_emae, "Evolución del EMAE (nivel general)",
                         "Comparación entre la serie original, desestacionalizada y tendencia-ciclo.",
                         "Fuente: INDEC (API Series de Tiempo datos.gob.ar)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_sec, "Semáforo sectorial de actividad (variación % interanual)",
                         "Desempeño interanual de los principales bloques productivos en el último mes publicado.",
                         "Fuente: INDEC (EMAE apertura por sectores, base 2004=100)."),
@@ -181,11 +159,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_icc, "Industria, construcción y consumo masivo (base 100)",
                         f"Series desestacionalizadas reexpresadas a base {fmt_month(base_dt) if base_dt else 'común'} = 100.",
                         "Fuente: INDEC (IPI Manufacturero, ISAC Construcción y Encuesta de Supermercados)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_uci, "Utilización de la capacidad instalada en la industria (UCI)",
                         "Porcentaje de utilización del parque industrial nacional y promedio del período.",
                         "Fuente: INDEC (Planilla oficial sh_capacidad.xls + serie histórica SSPM)."),

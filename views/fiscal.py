@@ -7,25 +7,9 @@ from dash import html
 
 from indicators import build_fiscal_kpis, real_base_month
 from pipeline import MacroData
-from ui.components import card, chart_card, empty_state, kpi_grid
+from ui.charts import chart_or_empty, trim, window
+from ui.components import kpi_grid
 from ui.theme import COLORS, SERIES
-
-
-def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if not years or df.empty:
-        return df
-    start = df["Fecha"].max() - pd.DateOffset(years=years)
-    return df[df["Fecha"] > start]
-
-
-def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    present = [c for c in cols if c in df]
-    if not present or df.empty:
-        return df.iloc[0:0]
-    mask = df[present].notna().any(axis=1)
-    if not mask.any():
-        return df.iloc[0:0]
-    return df.loc[mask.idxmax(): mask[::-1].idxmax()]
 
 
 def fig_ingresos_vs_gasto_real(df: pd.DataFrame) -> go.Figure | None:
@@ -34,7 +18,7 @@ def fig_ingresos_vs_gasto_real(df: pd.DataFrame) -> go.Figure | None:
         ("Gasto_Publico_Primario_Real", "Gasto Primario SPNF (Real)", SERIES[0], "solid", 2.1),
         ("Gasto_Publico_Total_Real", "Gasto Total c/ Intereses (Real)", SERIES[3], "dot", 1.8),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -50,7 +34,7 @@ def fig_ingresos_vs_gasto_real(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_resultado_fiscal_mensual_real(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Resultado_Primario_Base_Caja_Real", "Resultado_Financiero_Base_Caja_Real"])
+    d = trim(df, ["Resultado_Primario_Base_Caja_Real", "Resultado_Financiero_Base_Caja_Real"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -74,7 +58,7 @@ def fig_resultado_fiscal_mensual_real(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_resultado_fiscal_12m_real(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Resultado_Primario_Real_12m", "Resultado_Financiero_Real_12m"])
+    d = trim(df, ["Resultado_Primario_Real_12m", "Resultado_Financiero_Real_12m"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -105,7 +89,7 @@ def fig_recaudacion_tributaria_real(df: pd.DataFrame) -> go.Figure | None:
         ("Recaudacion_DGA_Real", "DGA (Comercio Exterior / Aduana)", SERIES[1]),
         ("Recaudacion_Seg_Social_Real", "Seguridad Social", SERIES[2]),
     ]
-    d = _trim(df, [c[0] for c in cols] + ["Recaudacion_Total_Real"])
+    d = trim(df, [c[0] for c in cols] + ["Recaudacion_Total_Real"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -126,16 +110,9 @@ def fig_recaudacion_tributaria_real(df: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
-def _chart_or_empty(fig, title, subtitle=None, footer=None, height=330, className=""):
-    if fig is None:
-        return card(empty_state("Sin datos disponibles para el período seleccionado."), title, subtitle,
-                    className=className)
-    return chart_card(fig, title, subtitle, footer, height, className)
-
-
 def layout(data: MacroData, years: int | None) -> html.Div:
     df = data.df
-    win = _window(df, years)
+    win = window(df, years)
 
     f_ig = fig_ingresos_vs_gasto_real(win)
     f_rm = fig_resultado_fiscal_mensual_real(win)
@@ -153,11 +130,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             kpi_grid(build_fiscal_kpis(df)),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_ig, "Ingresos totales, gasto primario y gasto total a precios constantes",
                         "Dinámica real de recursos y erogaciones del Sector Público Nacional No Financiero.",
                         "Fuente: Secretaría de Hacienda (IMIG) e INDEC (IPC)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_rm, "Resultado primario y financiero mensual real (base caja)",
                         "Superávit (verde) o déficit (rojo) primario mensual y resultado financiero luego de intereses.",
                         "Fuente: Secretaría de Hacienda (IMIG) e INDEC (IPC)."),
@@ -166,11 +143,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_r12, "Resultado fiscal acumulado de 12 meses a precios constantes",
                         "Suma móvil de 12 meses del resultado primario y financiero real para suavizar estacionalidad.",
                         "Fuente: Elaboración propia sobre Secretaría de Hacienda e INDEC."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_rec, "Recaudación tributaria nacional real por origen (DGI, Aduana y Seguridad Social)",
                         "Componentes de recursos tributarios deflactados por IPC y recaudación total.",
                         "Fuente: ARCA/AFIP, DNIAF - Ministerio de Economía e INDEC."),

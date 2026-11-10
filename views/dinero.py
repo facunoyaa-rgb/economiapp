@@ -7,25 +7,9 @@ from dash import html
 
 from indicators import build_dinero_kpis, real_base_month
 from pipeline import MacroData
-from ui.components import card, chart_card, empty_state, kpi_grid
+from ui.charts import chart_or_empty, trim, window
+from ui.components import kpi_grid
 from ui.theme import COLORS, SERIES
-
-
-def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if not years or df.empty:
-        return df
-    start = df["Fecha"].max() - pd.DateOffset(years=years)
-    return df[df["Fecha"] > start]
-
-
-def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    present = [c for c in cols if c in df]
-    if not present or df.empty:
-        return df.iloc[0:0]
-    mask = df[present].notna().any(axis=1)
-    if not mask.any():
-        return df.iloc[0:0]
-    return df.loc[mask.idxmax(): mask[::-1].idxmax()]
 
 
 def fig_agregados_monetarios_reales(df: pd.DataFrame) -> go.Figure | None:
@@ -34,7 +18,7 @@ def fig_agregados_monetarios_reales(df: pd.DataFrame) -> go.Figure | None:
         ("Circulacion_Monetaria_Real", "Circulación Monetaria Real", SERIES[1], 1.9),
         ("Depositos_Plazo_Fijo_Real", "Plazos Fijos Sector Privado Real", SERIES[2], 2.0),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -50,7 +34,7 @@ def fig_agregados_monetarios_reales(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_credito_vs_depositos_reales(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Credito_Interno_Real", "Depositos_Privados_Pesos_Real", "Ratio_Prestamos_Depositos_Pct"])
+    d = trim(df, ["Credito_Interno_Real", "Depositos_Privados_Pesos_Real", "Ratio_Prestamos_Depositos_Pct"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -89,7 +73,7 @@ def fig_carrera_salarial_real(df: pd.DataFrame) -> go.Figure | None:
         ("Indice_Salarios_Publico_Real", "Sector Público (INDEC)", SERIES[1], 1.9, "dash"),
         ("Indice_Salarios_No_Reg_Real", "Sector Privado No Registrado (INDEC)", SERIES[3], 1.9, "dot"),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -113,7 +97,7 @@ def fig_mercado_laboral_y_pobreza(df: pd.DataFrame) -> go.Figure | None:
         ("Pobreza_Personas", "Incidencia Pobreza Personas (%)", SERIES[1], "lines+markers"),
         ("Pobreza_Hogares", "Incidencia Pobreza Hogares (%)", SERIES[4], "lines+markers"),
     ]
-    d = _trim(df, [c[0] for c in cols] + ["Ratio_Salario_CBT"])
+    d = trim(df, [c[0] for c in cols] + ["Ratio_Salario_CBT"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -145,16 +129,9 @@ def fig_mercado_laboral_y_pobreza(df: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
-def _chart_or_empty(fig, title, subtitle=None, footer=None, height=330, className=""):
-    if fig is None:
-        return card(empty_state("Sin datos disponibles para el período seleccionado."), title, subtitle,
-                    className=className)
-    return chart_card(fig, title, subtitle, footer, height, className)
-
-
 def layout(data: MacroData, years: int | None) -> html.Div:
     df = data.df
-    win = _window(df, years)
+    win = window(df, years)
 
     f_mon = fig_agregados_monetarios_reales(win)
     f_cre = fig_credito_vs_depositos_reales(win)
@@ -172,11 +149,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             kpi_grid(build_dinero_kpis(df)),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_mon, "Agregados monetarios reales (base, circulación y plazos fijos)",
                         "Saldos nominales deflactados a pesos constantes del último IPC publicado.",
                         "Fuente: BCRA e INDEC (IPC)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_cre, "Intermediación financiera: crédito y depósitos reales en pesos",
                         "Stock de préstamos y depósitos privados en ARS constantes y ratio Préstamos/Depósitos.",
                         "Fuente: BCRA e INDEC."),
@@ -185,11 +162,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_sal, "Salario real por sector (base 100 = inicio del período)",
                         "Poder adquisitivo comparado entre RIPTE, Privado Registrado, Público e Informal.",
                         "Fuente: Secretaría de Trabajo (RIPTE) e INDEC (Índice de Salarios e IPC)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_lab, "Desocupación, pobreza (EPH) y cobertura de la canasta básica",
                         "Tasas socioeconómicas (eje izq.) y cantidad de CBT individuales cubiertas por un RIPTE (eje der.).",
                         "Fuente: INDEC (EPH, Valorización de Canastas) y Secretaría de Trabajo."),

@@ -7,28 +7,11 @@ from dash import html
 
 from indicators import build_precios_kpis, real_base_month
 from pipeline import MacroData
-from ui.components import card, chart_card, empty_state, kpi_grid
-from ui.format import fmt_month
+from ui.charts import chart_or_empty, trim, window
+from ui.components import kpi_grid
 from ui.theme import COLORS, SERIES
 
 HOVER_PCT = "%{y:.2f}%"
-
-
-def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if not years or df.empty:
-        return df
-    start = df["Fecha"].max() - pd.DateOffset(years=years)
-    return df[df["Fecha"] > start]
-
-
-def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    present = [c for c in cols if c in df]
-    if not present or df.empty:
-        return df.iloc[0:0]
-    mask = df[present].notna().any(axis=1)
-    if not mask.any():
-        return df.iloc[0:0]
-    return df.loc[mask.idxmax(): mask[::-1].idxmax()]
 
 
 def fig_ipc_categorias(df: pd.DataFrame) -> go.Figure | None:
@@ -38,7 +21,7 @@ def fig_ipc_categorias(df: pd.DataFrame) -> go.Figure | None:
         ("IPC_Regulados_Mensual_Pct", "IPC Regulados (Tarifas)", SERIES[3], 1.7, "dot"),
         ("IPC_Estacionales_Mensual_Pct", "IPC Estacionales", SERIES[2], 1.5, "dash"),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -60,7 +43,7 @@ def fig_minorista_mayorista_rem(df: pd.DataFrame) -> go.Figure | None:
         ("IPIM_Interanual_Pct", "Precios Mayoristas IPIM (i.a.)", SERIES[3]),
         ("REM_Inflacion_12m", "Inflación esperada próx. 12m (REM BCRA)", SERIES[2]),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -81,7 +64,7 @@ def fig_estructura_tasas(df: pd.DataFrame) -> go.Figure | None:
         ("Tasa_Adelantos", "Activa Adelantos CC (Empresas)", SERIES[3]),
         ("Tasa_Personales", "Activa Préstamos Personales", SERIES[4]),
     ]
-    d = _trim(df, [c[0] for c in cols])
+    d = trim(df, [c[0] for c in cols])
     if d.empty:
         return None
     fig = go.Figure()
@@ -95,7 +78,7 @@ def fig_estructura_tasas(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_tasas_reales(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Tasa_Interes_Real_Mensual_Exacta", "Tasa_Real_ExAnte_Anual_Pct"])
+    d = trim(df, ["Tasa_Interes_Real_Mensual_Exacta", "Tasa_Real_ExAnte_Anual_Pct"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -124,16 +107,9 @@ def fig_tasas_reales(df: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
-def _chart_or_empty(fig, title, subtitle=None, footer=None, height=330, className=""):
-    if fig is None:
-        return card(empty_state("Sin datos disponibles para el período seleccionado."), title, subtitle,
-                    className=className)
-    return chart_card(fig, title, subtitle, footer, height, className)
-
-
 def layout(data: MacroData, years: int | None) -> html.Div:
     df = data.df
-    win = _window(df, years)
+    win = window(df, years)
 
     f_cat = fig_ipc_categorias(win)
     f_mmr = fig_minorista_mayorista_rem(win)
@@ -151,11 +127,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             kpi_grid(build_precios_kpis(df)),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_cat, "Anatomía de la inflación mensual (IPC por categorías)",
                         "Comparación mensual entre Nivel General, IPC Núcleo, Regulados (tarifas) y Estacionales.",
                         "Fuente: INDEC (IPC Nacional base dic-2016 = 100)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_mmr, "Inflación minorista, mayorista (IPIM) y expectativas (REM)",
                         "Variación interanual del IPC y del IPIM frente a la inflación esperada a 12 meses del REM.",
                         "Fuente: INDEC (IPC e IPIM) y BCRA (Relevamiento de Expectativas de Mercado)."),
@@ -164,11 +140,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_tas, "Estructura de tasas de interés pasivas y activas (TNA %)",
                         "Tasas de depósitos (Plazo Fijo, BADLAR, TAMAR) vs. costo del crédito (Adelantos y Personales).",
                         "Fuente: BCRA (vía datos.gob.ar y API de Estadísticas)."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_rea, "Rendimiento real del peso: ex-post (IPC) y ex-ante (REM 12 m)",
                         "Barras: tasa real mensual observada (Fisher). Línea: tasa anualizada contra inflación esperada REM.",
                         f"Fuente: Elaboración propia sobre datos de INDEC y BCRA (último IPC: {real_base_month(df)})."),

@@ -44,7 +44,7 @@ def _provider_summary_cards(data: MacroData) -> html.Div:
             html.Div(
                 [
                     html.Div(html.Span(title, className="kpi-title"), className="kpi-head"),
-                    html.Div(html.Div(ok_txt, className="kpi-value", style={"fontSize": "1.12rem"}), className="kpi-body"),
+                    html.Div(html.Div(ok_txt, className="kpi-value kpi-value--sm"), className="kpi-body"),
                     html.Div(obs_txt, className="kpi-date"),
                 ],
                 className="kpi-card",
@@ -65,7 +65,7 @@ def layout(data: MacroData, years: int | None = None) -> html.Div:
                 [
                     html.Td(html.Strong(col.replace("_", " "))),
                     html.Td(prov),
-                    html.Td(html.Code(str(s.get("id", "")), style={"fontSize": "0.72rem"})),
+                    html.Td(html.Code(str(s.get("id", "")), className="series-id")),
                     html.Td("Diaria" if freq == "D" else "Mensual"),
                     html.Td(s.get("unidad", "—")),
                     html.Td(STATUS_LABELS.get(s.get("estado", ""), s.get("estado", "")),
@@ -125,32 +125,27 @@ def layout(data: MacroData, years: int | None = None) -> html.Div:
         [
             html.Div(
                 [
-                    html.Strong("Exportación de bases de datos consolidadas: "),
+                    html.Strong("Paneles consolidados: "),
                     html.Span(
                         f"Panel mensual ({len(data.df)} filas × {len(data.df.columns)} columnas) · "
                         f"Panel diario ({len(data.daily_df)} filas × {len(data.daily_df.columns)} columnas) · "
                         f"Última actualización {fmt_ago(data.fetched_at)}.",
                         className="muted",
                     ),
-                ]
+                ],
+                className="export-text",
             ),
             html.Div(
                 [
-                    html.Button("⬇ Descargar Panel Mensual (CSV)", id="btn-download-monthly", n_clicks=0, className="btn"),
-                    html.Button("⬇ Descargar Panel Diario (CSV)", id="btn-download-daily", n_clicks=0, className="btn"),
+                    html.Button("⬇ Panel mensual (CSV)", id="btn-download-monthly", n_clicks=0, className="btn"),
+                    html.Button("⬇ Panel diario (CSV)", id="btn-download-daily", n_clicks=0, className="btn"),
                     dcc.Download(id="download-monthly-csv"),
                     dcc.Download(id="download-daily-csv"),
                 ],
-                style={"display": "flex", "gap": "0.6rem", "flexWrap": "wrap"},
+                className="export-actions",
             ),
         ],
-        style={
-            "display": "flex",
-            "justifyContent": "space-between",
-            "alignItems": "center",
-            "gap": "1rem",
-            "flexWrap": "wrap",
-        },
+        className="export-bar",
     )
 
     table = html.Div(
@@ -175,7 +170,7 @@ def layout(data: MacroData, years: int | None = None) -> html.Div:
             ],
             className="status-table",
         ),
-        style={"overflowX": "auto", "maxHeight": "540px", "overflowY": "auto"},
+        className="table-scroll",
     )
 
     return html.Div(

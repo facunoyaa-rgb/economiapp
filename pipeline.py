@@ -15,7 +15,7 @@ alta frecuencia (`daily_df`) junto con las cotizaciones cambiarias en vivo (`fx_
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import io
 import json
@@ -813,6 +813,8 @@ class MacroData:
     error: str | None = None
     daily_df: pd.DataFrame = field(default_factory=lambda: pd.DataFrame(columns=["Fecha"]))
     fx_quotes: list[dict] = field(default_factory=list)
+    refresh_skipped: bool = False                         # se pidió actualizar, pero la caché es muy reciente
+    min_refresh_minutes: int = 15
 
     @property
     def n_ok(self) -> int:
@@ -843,9 +845,86 @@ def _finalize(raw: pd.DataFrame, config: dict) -> pd.DataFrame:
     return df.reset_index()
 
 
+# --------------------------------------------------------------------------- #
+# Memoria del proceso y control de descargas
+# --------------------------------------------------------------------------- #
+# Un solo hilo descarga a la vez: evita que varias solicitudes simultáneas (o varios clics en
+# "Actualizar") disparen descargas paralelas contra las mismas fuentes.
+_FETCH_LOCK = threading.Lock()
+# Último MacroData armado, para no releer el Parquet ni recalcular derive() en cada interacción.
+_MEMO: dict = {}
+MEMO_STALE_RETRY_MINUTES = 10  # si las fuentes fallaron, cuánto esperar antes de reintentar
+
+
+def _cache_signature(config: dict) -> tuple:
+    paths = [*_cache_paths(config), _daily_cache_path(config)]
+    return tuple((str(p), p.stat().st_mtime_ns if p.exists() else None) for p in paths)
+
+
+def _cache_age_minutes(config: dict) -> float | None:
+    _, meta_path = _cache_paths(config)
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        fetched_at = datetime.fromisoformat(meta["fetched_at"])
+    except Exception:  # noqa: BLE001
+        return None
+    return (datetime.now(timezone.utc) - fetched_at).total_seconds() / 60
+
+
+def _memo_get(config: dict) -> MacroData | None:
+    entry = _MEMO.get(str(_cache_paths(config)[0]))
+    if not entry or entry["signature"] != _cache_signature(config):
+        return None
+    data: MacroData = entry["data"]
+    now = datetime.now(timezone.utc)
+    if data.source == "cache_desactualizada":
+        fresh = (now - entry["created_at"]).total_seconds() / 60 < MEMO_STALE_RETRY_MINUTES
+    else:
+        max_age_h = config.get("cache", {}).get("max_age_hours", 6)
+        fresh = data.fetched_at is not None and (now - data.fetched_at).total_seconds() / 3600 < max_age_h
+    return data if fresh else None
+
+
+def _memo_put(config: dict, data: MacroData) -> None:
+    _MEMO[str(_cache_paths(config)[0])] = {
+        "signature": _cache_signature(config),
+        "created_at": datetime.now(timezone.utc),
+        "data": data,
+    }
+
+
 def get_macro_data(config_path: str | Path = DEFAULT_CONFIG, force: bool = False) -> MacroData:
-    """Punto de entrada principal. Usa caché si está fresca, si no descarga y actualiza la caché."""
+    """Punto de entrada principal.
+
+    Devuelve los datos desde la memoria del proceso o la caché si están frescos; si no, descarga.
+    `force=True` (botón Actualizar) se respeta como máximo una vez cada `cache.min_refresh_minutes`.
+    """
     config = load_config(config_path)
+    min_refresh = int(config.get("cache", {}).get("min_refresh_minutes", 15))
+    skipped = False
+    if force:
+        age_min = _cache_age_minutes(config)
+        if age_min is not None and age_min < min_refresh:
+            force, skipped = False, True
+
+    data = None if force else _memo_get(config)
+    if data is None:
+        with _FETCH_LOCK:
+            # Mientras esperábamos el candado, otra solicitud pudo haber descargado.
+            if force:
+                age_min = _cache_age_minutes(config)
+                if age_min is not None and age_min < 1:
+                    force = False
+            data = None if force else _memo_get(config)
+            if data is None:
+                data = _load_or_fetch(config, force)
+                _memo_put(config, data)
+    data = replace(data, min_refresh_minutes=min_refresh)
+    return replace(data, refresh_skipped=True) if skipped else data
+
+
+def _load_or_fetch(config: dict, force: bool) -> MacroData:
+    """Usa la caché si está fresca; si no, descarga y actualiza la caché."""
     catalog = resolve_catalog(config)
     max_age_h = config.get("cache", {}).get("max_age_hours", 6)
     cached = read_cache(config)

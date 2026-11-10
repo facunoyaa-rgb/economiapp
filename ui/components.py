@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 from urllib.parse import quote
 
+import numpy as np
 from dash import dcc, html
 
 from indicators import KPI
@@ -80,7 +81,7 @@ def kpi_card(k: KPI) -> html.Div:
         [
             html.Div(
                 [html.Span(k.title, className="kpi-title"),
-                 html.Span("ⓘ", className="kpi-help", title=k.help) if k.help else None],
+                 help_tip(k.help) if k.help else None],
                 className="kpi-head",
             ),
             html.Div(
@@ -96,6 +97,11 @@ def kpi_card(k: KPI) -> html.Div:
     )
 
 
+def help_tip(text: str) -> html.Button:
+    """Botón "ⓘ" con un globo de ayuda que aparece al pasar el mouse o al enfocarlo con el teclado."""
+    return html.Button("ⓘ", type="button", className="kpi-help", **{"aria-label": f"Ayuda: {text}", "data-tip": text})
+
+
 def kpi_grid(kpis: list[KPI]) -> html.Div:
     return html.Div([kpi_card(k) for k in kpis], className="kpi-grid")
 
@@ -104,14 +110,16 @@ def kpi_grid(kpis: list[KPI]) -> html.Div:
 # Contenedores
 # --------------------------------------------------------------------------- #
 def card(children, title: str | None = None, subtitle: str | None = None, footer: str | None = None,
-         className: str = "") -> html.Div:
+         className: str = "", actions=None) -> html.Div:
     head = None
-    if title or subtitle:
-        head = html.Div(
+    if title or subtitle or actions:
+        text = html.Div(
             [html.H3(title, className="card-title") if title else None,
              html.P(subtitle, className="card-subtitle") if subtitle else None],
-            className="card-head",
+            className="card-head-text",
         )
+        head = html.Div([text, html.Div(actions, className="card-actions") if actions else None],
+                        className="card-head")
     return html.Div(
         [head, html.Div(children, className="card-content"),
          html.Div(footer, className="card-footer") if footer else None],
@@ -119,11 +127,47 @@ def card(children, title: str | None = None, subtitle: str | None = None, footer
     )
 
 
+def chart_actions() -> list[html.Button]:
+    """Exportación del gráfico. La resuelve assets/ui.js en el navegador con los datos ya cargados."""
+    return [
+        html.Button("CSV", type="button", className="chart-action", **{
+            "data-action": "csv", "title": "Descargar los datos de este gráfico (CSV)",
+            "aria-label": "Descargar los datos de este gráfico en CSV"}),
+        html.Button("PNG", type="button", className="chart-action", **{
+            "data-action": "png", "title": "Descargar el gráfico como imagen con fondo claro, para informes",
+            "aria-label": "Descargar el gráfico como imagen PNG con fondo claro"}),
+    ]
+
+
+FLOAT32_MIN_POINTS = 400
+
+
+def compact_figure(fig) -> None:
+    """Achica el JSON de la figura que viaja al navegador.
+
+    - Fechas como 'AAAA-MM-DD' en lugar de '2021-11-20T00:00:00.000000' (series diarias o mensuales).
+    - En series largas (diarias), valores en float32: 7 dígitos significativos alcanzan para
+      tipos de cambio, tasas, reservas e índices, y ocupan la mitad.
+    En la pestaña diaria con 5 años, la respuesta baja de ~1 MB a ~0,5 MB.
+    """
+    for tr in fig.data:
+        for axis in ("x", "y"):
+            vals = getattr(tr, axis, None)
+            if vals is None or len(vals) == 0:
+                continue
+            arr = np.asarray(vals)
+            if np.issubdtype(arr.dtype, np.datetime64):
+                setattr(tr, axis, np.datetime_as_string(arr.astype("datetime64[D]"), unit="D"))
+            elif arr.dtype == np.float64 and len(arr) > FLOAT32_MIN_POINTS:
+                setattr(tr, axis, arr.astype(np.float32))
+
+
 def chart_card(fig, title: str, subtitle: str | None = None, footer: str | None = None,
                height: int = 320, className: str = "") -> html.Div:
     fig.update_layout(height=height)
-    return card(dcc.Graph(figure=fig, config=GRAPH_CONFIG, style={"height": f"{height}px"}),
-                title, subtitle, footer, className)
+    compact_figure(fig)
+    graph = dcc.Graph(figure=fig, config=GRAPH_CONFIG, style={"height": f"{height}px"})
+    return card(graph, title, subtitle, footer, f"chart-card {className}".strip(), actions=chart_actions())
 
 
 def insight_list(items) -> html.Ul:

@@ -7,28 +7,15 @@ from dash import html
 
 from indicators import build_high_freq_kpis
 from pipeline import MacroData
-from ui.components import card, chart_card, empty_state, kpi_grid
+from ui.charts import chart_or_empty as _chart_or_empty_base, trim, window
+from ui.components import kpi_grid
 from ui.format import fmt_day, fmt_num, fmt_pct, fmt_quote_time
 from ui.theme import COLORS, SERIES
 
 
-def _window_daily(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame(columns=["Fecha"])
-    if not years:
-        return df
-    start = df["Fecha"].max() - pd.DateOffset(years=years)
-    return df[df["Fecha"] > start]
-
-
-def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    present = [c for c in cols if c in df]
-    if not present or df.empty:
-        return df.iloc[0:0]
-    mask = df[present].notna().any(axis=1)
-    if not mask.any():
-        return df.iloc[0:0]
-    return df.loc[mask.idxmax(): mask[::-1].idxmax()]
+def chart_or_empty(*args, **kwargs):
+    kwargs.setdefault("empty_text", "Sin datos diarios disponibles para el período seleccionado.")
+    return _chart_or_empty_base(*args, **kwargs)
 
 
 def fx_board(fx_quotes: list[dict], may_ref: float | None = None) -> html.Div:
@@ -80,7 +67,7 @@ def fx_board(fx_quotes: list[dict], may_ref: float | None = None) -> html.Div:
 
 
 def fig_dolares_y_brecha(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["TC_Mayorista", "TC_Minorista", "Dolar_Blue", "Brecha_Cambiaria_Pct"])
+    d = trim(df, ["TC_Mayorista", "TC_Minorista", "Dolar_Blue", "Brecha_Cambiaria_Pct"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -113,7 +100,7 @@ def fig_dolares_y_brecha(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_riesgo_y_reservas_diario(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Riesgo_Pais", "Reservas_BCRA"])
+    d = trim(df, ["Riesgo_Pais", "Reservas_BCRA"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -144,7 +131,7 @@ def fig_tasas_diarias(df: pd.DataFrame) -> go.Figure | None:
         "Tasa_Adelantos": "Activa Adelantos CC",
         "Tasa_Personales": "Activa Préstamos Personales",
     }
-    d = _trim(df, list(cols))
+    d = trim(df, list(cols))
     if d.empty:
         return None
     fig = go.Figure()
@@ -167,7 +154,7 @@ def fig_indexadores_e_itcrm_diario(df: pd.DataFrame) -> go.Figure | None:
     present = {c: lbl for c, lbl in cols.items() if c in df and df[c].notna().any()}
     if not present:
         return None
-    d = _trim(df, list(present)).copy()
+    d = trim(df, list(present)).copy()
     d_ff = d.ffill()
     base_date = max(d_ff.loc[d_ff[c].notna(), "Fecha"].min() for c in present)
     d_ff = d_ff[d_ff["Fecha"] >= base_date]
@@ -188,16 +175,9 @@ def fig_indexadores_e_itcrm_diario(df: pd.DataFrame) -> go.Figure | None:
     return fig
 
 
-def _chart_or_empty(fig, title, subtitle=None, footer=None, height=330, className=""):
-    if fig is None:
-        return card(empty_state("Sin datos diarios disponibles para el período seleccionado."), title, subtitle,
-                    className=className)
-    return chart_card(fig, title, subtitle, footer, height, className)
-
-
 def layout(data: MacroData, years: int | None) -> html.Div:
     daily_df = data.daily_df
-    win = _window_daily(daily_df, years)
+    win = window(daily_df, years)
 
     f_fx = fig_dolares_y_brecha(win)
     f_rr = fig_riesgo_y_reservas_diario(win)
@@ -224,11 +204,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             board,
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_fx, "Tipos de cambio diarios y brecha cambiaria",
                         "Evolución diaria del Dólar Mayorista (A3500), Minorista y Blue, junto con la brecha (%).",
                         "Fuente: BCRA y Bluelytics."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_rr, "Reservas internacionales brutas y riesgo país (diario)",
                         "Stock diario de reservas del BCRA (USD M) y sobretasa EMBI+ JP Morgan (puntos básicos).",
                         "Fuente: BCRA, Ámbito Financiero y Rava Bursátil."),
@@ -237,11 +217,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_ts, "Curva de tasas de interés diarias (TNA %)",
                         "Tasas pasivas mayoristas (BADLAR y TAMAR) y tasas activas (Adelantos CC y Personales).",
                         "Fuente: BCRA."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_ix, "Indexadores diarios y dólar mayorista (base 100)",
                         "Carrera diaria entre UVA (IPC), UVI (Construcción), CER y el tipo de cambio oficial.",
                         "Fuente: BCRA."),

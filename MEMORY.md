@@ -1,3 +1,5 @@
+> **Nota (nov 2026):** este archivo es el registro histórico de la primera versión, hecha en Streamlit. Para la arquitectura actual (Dash, pipeline multifuente y 8 secciones), ver el [README](README.md).
+
 # MEMORY.md - Memoria a Largo Plazo
 
 ## Proyecto: Dashboard de Variables Macroeconómicas Argentinas

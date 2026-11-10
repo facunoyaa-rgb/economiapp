@@ -231,3 +231,89 @@ def test_quote_time_in_argentina():
 
     assert fmt_quote_time("2026-11-05T18:55:00.000Z") == "05 nov 15:55"
     assert fmt_quote_time(None) == DASH
+
+
+# --------------------------------------------------------------------------- #
+# Fase 2: navegación, actualización y memoria
+# --------------------------------------------------------------------------- #
+def test_view_from_hash():
+    import app
+
+    assert app.view_from_hash("#fiscal") == "fiscal"
+    assert app.view_from_hash("#alta-frecuencia") == "alta_frecuencia"
+    assert app.view_from_hash("") == "resumen"
+    assert app.view_from_hash(None) == "resumen"
+    assert app.view_from_hash("#no-existe") == "resumen"
+
+
+def _fresh_cache(tmp_path, monkeypatch, minutes_ago: float):
+    from datetime import timedelta
+
+    import pipeline
+
+    cfg = load_config()
+    cfg["cache"]["dir"] = str(tmp_path)
+    cfg["cache"]["max_age_hours"] = 6
+    cfg["cache"]["min_refresh_minutes"] = 15
+    idx = pd.date_range("2026-01-01", periods=3, freq="MS", name="Fecha")
+    catalog = resolve_catalog(cfg)
+    raw = pd.DataFrame({c: [1.0, 2.0, 3.0] for c in catalog}, index=idx)
+    fetched = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+    write_cache(cfg, raw, {"fetched_at": fetched.isoformat(), "series": {}})
+    monkeypatch.setattr("pipeline.load_config", lambda _=None: cfg)
+    pipeline._MEMO.clear()
+    calls = {"n": 0}
+
+    def _fake_fetch(_cfg):
+        calls["n"] += 1
+        return raw, {}
+
+    monkeypatch.setattr("pipeline.fetch_all", _fake_fetch)
+    return calls
+
+
+def test_refresh_is_ignored_when_cache_is_recent(tmp_path, monkeypatch):
+    calls = _fresh_cache(tmp_path, monkeypatch, minutes_ago=4)
+    data = get_macro_data(force=True)
+    assert calls["n"] == 0
+    assert data.refresh_skipped and data.source == "cache"
+
+
+def test_refresh_downloads_when_cache_is_older_than_min_interval(tmp_path, monkeypatch):
+    calls = _fresh_cache(tmp_path, monkeypatch, minutes_ago=30)
+    data = get_macro_data(force=True)
+    assert calls["n"] == 1
+    assert not data.refresh_skipped and data.source == "api"
+
+
+def test_memo_avoids_rereading_the_cache(tmp_path, monkeypatch):
+    import pipeline
+
+    _fresh_cache(tmp_path, monkeypatch, minutes_ago=4)
+    first = get_macro_data()
+    reads = {"n": 0}
+    real_read = pipeline.read_cache
+
+    def _counting_read(cfg):
+        reads["n"] += 1
+        return real_read(cfg)
+
+    monkeypatch.setattr("pipeline.read_cache", _counting_read)
+    second = get_macro_data()
+    assert reads["n"] == 0
+    assert second.df is first.df
+
+
+def test_compact_figure_dates_and_long_series():
+    import plotly.graph_objects as go
+
+    from ui.components import FLOAT32_MIN_POINTS, compact_figure
+
+    n = FLOAT32_MIN_POINTS + 10
+    fechas = pd.date_range("2024-01-01", periods=n, freq="D")
+    fig = go.Figure([go.Scatter(x=fechas, y=np.linspace(1000, 1600, n)),
+                     go.Scatter(x=fechas[:12], y=np.arange(12, dtype=float))])
+    compact_figure(fig)
+    assert fig.data[0].x[0] == "2024-01-01"
+    assert np.asarray(fig.data[0].y).dtype == np.float32      # serie larga
+    assert np.asarray(fig.data[1].y).dtype == np.float64      # serie corta: precisión completa

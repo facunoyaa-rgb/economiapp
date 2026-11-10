@@ -7,36 +7,19 @@ from dash import html
 
 from indicators import build_insights, build_kpis, real_base_month
 from pipeline import MacroData
-from ui.components import card, chart_card, empty_state, insight_list, kpi_grid
+from ui.charts import chart_or_empty, trim, window
+from ui.components import card, insight_list, kpi_grid
 from ui.format import fmt_month
 from ui.theme import COLORS, SERIES
 
 HOVER_PCT = "%{y:.2f}%"
 
 
-def _window(df: pd.DataFrame, years: int | None) -> pd.DataFrame:
-    if not years or df.empty:
-        return df
-    start = df["Fecha"].max() - pd.DateOffset(years=years)
-    return df[df["Fecha"] > start]
-
-
-def _trim(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    """Recorta filas iniciales/finales donde todas las columnas son nulas."""
-    present = [c for c in cols if c in df]
-    if not present:
-        return df.iloc[0:0]
-    mask = df[present].notna().any(axis=1)
-    if not mask.any():
-        return df.iloc[0:0]
-    return df.loc[mask.idxmax(): mask[::-1].idxmax()]
-
-
 # --------------------------------------------------------------------------- #
 # Figuras
 # --------------------------------------------------------------------------- #
 def fig_inflacion_vs_tasa(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Inflacion_Mensual_Pct", "Tasa_Nominal_Mensual_Pct"])
+    d = trim(df, ["Inflacion_Mensual_Pct", "Tasa_Nominal_Mensual_Pct"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -76,7 +59,7 @@ def fig_base100(df: pd.DataFrame) -> tuple[go.Figure | None, pd.Timestamp | None
 
 
 def fig_saldo_comercial(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Saldo_Comercial"])
+    d = trim(df, ["Saldo_Comercial"])
     if d.empty:
         return None
     colors = [COLORS["good"] if v >= 0 else COLORS["bad"] for v in d["Saldo_Comercial"].fillna(0)]
@@ -93,7 +76,7 @@ def fig_saldo_comercial(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_reservas_y_riesgo(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Reservas_BCRA", "Riesgo_Pais"])
+    d = trim(df, ["Reservas_BCRA", "Riesgo_Pais"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -120,7 +103,7 @@ def fig_reservas_y_riesgo(df: pd.DataFrame) -> go.Figure | None:
 
 
 def fig_resultado_fiscal(df: pd.DataFrame) -> go.Figure | None:
-    d = _trim(df, ["Resultado_Primario_Base_Caja_Real", "Resultado_Financiero_Base_Caja_Real"])
+    d = trim(df, ["Resultado_Primario_Base_Caja_Real", "Resultado_Financiero_Base_Caja_Real"])
     if d.empty:
         return None
     fig = go.Figure()
@@ -145,16 +128,9 @@ def fig_resultado_fiscal(df: pd.DataFrame) -> go.Figure | None:
 # --------------------------------------------------------------------------- #
 # Layout
 # --------------------------------------------------------------------------- #
-def _chart_or_empty(fig, title, subtitle=None, footer=None, height=320, className=""):
-    if fig is None:
-        return card(empty_state("Sin datos disponibles para el período seleccionado."), title, subtitle,
-                    className=className)
-    return chart_card(fig, title, subtitle, footer, height, className)
-
-
 def layout(data: MacroData, years: int | None) -> html.Div:
     df = data.df
-    win = _window(df, years)
+    win = window(df, years)
 
     f_infl = fig_inflacion_vs_tasa(win)
     f_b100, base_date = fig_base100(win)
@@ -179,7 +155,7 @@ def layout(data: MacroData, years: int | None) -> html.Div:
                 [
                     card(insight_list(build_insights(df)), "Lectura rápida",
                          "Generada automáticamente a partir de los últimos datos.", className="span-1"),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_infl, "Inflación, tasa de interés y crawling peg",
                         "En % mensual. Si la tasa supera a la inflación, el rendimiento real ex-post es positivo.",
                         "Fuente: INDEC (IPC) y BCRA (plazo fijo 30-59 días y TC Mayorista A3500).", className="span-2"),
@@ -188,11 +164,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_b100, "Actividad, salario real y crédito real",
                         "Evolución relativa sobre una base común (= 100).",
                         b100_note or "Fuente: INDEC, Secretaría de Trabajo (RIPTE) y BCRA. Deflactado por IPC."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_saldo, "Comercio exterior",
                         "Exportaciones, importaciones y saldo mensual.",
                         "Fuente: INDEC, Intercambio Comercial Argentino (ICA)."),
@@ -201,11 +177,11 @@ def layout(data: MacroData, years: int | None) -> html.Div:
             ),
             html.Div(
                 [
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_res, "Reservas internacionales y riesgo país",
                         "Stock de reservas brutas del BCRA (eje izq.) y sobretasa soberana EMBI+ (eje der.).",
                         "Fuente: BCRA, Ámbito Financiero y Rava Bursátil."),
-                    _chart_or_empty(
+                    chart_or_empty(
                         f_fis, "Resultado fiscal primario (real)",
                         "Resultado mensual y acumulado de 12 meses a precios del último IPC.",
                         "Fuente: Secretaría de Hacienda (Esquema Ahorro-Inversión-Financiamiento Base Caja)."),

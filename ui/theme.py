@@ -58,6 +58,7 @@ pio.templates.default = TEMPLATE_NAME
 
 GRAPH_CONFIG = {
     "displaylogo": False,
-    "modeBarButtonsToRemove": ["lasso2d", "select2d", "autoScale2d", "toggleSpikelines"],
+    # La imagen se exporta con el botón propio "PNG" de cada tarjeta (fondo claro para informes).
+    "modeBarButtonsToRemove": ["lasso2d", "select2d", "autoScale2d", "toggleSpikelines", "toImage"],
     "locale": "es",
 }
