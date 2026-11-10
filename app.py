@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 
+
 from dash import ALL, Dash, Input, Output, State, callback, clientside_callback, ctx, dcc, html, no_update
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -34,11 +35,19 @@ app = Dash(
     ],
     external_scripts=["https://cdn.plot.ly/plotly-locale-es-latest.js"],
     suppress_callback_exceptions=True,
-    # Carga plotly.js junto con el resto de los scripts, en vez de pedirlo recién después del primer callback.
-    eager_loading=True,
 )
 server = app.server
 server.wsgi_app = ProxyFix(server.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+def _plotly_bundle_url() -> str:
+    """URL con la que dcc.Graph pide plotly.js cuando aparece el primer gráfico.
+
+    Se usa en un <link rel="preload">, para que el navegador empiece a bajar plotly.js (~1,4 MB)
+    en paralelo al cargar la página. No se usa `eager_loading=True` porque además bajaría y ejecutaría
+    todos los componentes asíncronos de Dash (MathJax, tablas, Markdown...): ~3 MB que la app no usa.
+    """
+    return f"{app.config.requests_pathname_prefix}_dash-component-suites/plotly/package_data/plotly.min.js"
+
 
 app.index_string = f"""<!DOCTYPE html>
 <html lang="es-AR">
@@ -47,6 +56,7 @@ app.index_string = f"""<!DOCTYPE html>
         <title>{{%title%}}</title>
         <meta name="description" content="{APP_DESCRIPTION}">
         <meta name="theme-color" content="#0e1117">
+        <link rel="preload" href="{_plotly_bundle_url()}" as="script">
         <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
         <meta property="og:type" content="website">
         <meta property="og:locale" content="es_AR">
